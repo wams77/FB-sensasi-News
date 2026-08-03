@@ -1,35 +1,277 @@
-from dotenv import load_dotenv
+from __future__ import annotations
+
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID")
+DATA_DIR = BASE_DIR / "data"
+LOG_DIR = BASE_DIR / "logs"
+CACHE_DIR = BASE_DIR / "cache"
 
-FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN")
+DATA_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(exist_ok=True)
+CACHE_DIR.mkdir(exist_ok=True)
 
-MAX_POST = int(os.getenv("MAX_POST", 1))
+# ==========================
+# API
+# ==========================
 
-MIN_SCORE = int(os.getenv("MIN_SCORE", 70))
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
+FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "")
+
+FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN", "")
+
+# ==========================
+# BOT
+# ==========================
+
+MAX_POST = int(os.getenv("MAX_POST", "1"))
+
+MIN_VIRAL_SCORE = int(os.getenv("MIN_VIRAL_SCORE", "80"))
+
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
+
+MAX_RETRY = int(os.getenv("MAX_RETRY", "3"))
+
+USER_AGENT = (
+    "Mozilla/5.0 "
+    "(Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 "
+    "(KHTML, like Gecko) "
+    "Chrome/138.0 Safari/537.36"
+)
+
+# ==========================
+# RSS
+# ==========================
 
 RSS_FEEDS = [
 
-    # FOOTBALL
+    {
+        "name": "BBC Football",
+        "category": "football",
+        "url": "https://feeds.bbci.co.uk/sport/football/rss.xml",
+    },
 
-    "https://feeds.bbci.co.uk/sport/football/rss.xml",
+    {
+        "name": "ESPN Soccer",
+        "category": "football",
+        "url": "https://www.espn.com/espn/rss/soccer/news",
+    },
 
-    "https://www.espn.com/espn/rss/soccer/news",
+    {
+        "name": "Soompi",
+        "category": "kpop",
+        "url": "https://www.soompi.com/feed",
+    },
 
-    "https://www.fifa.com/rss/index.xml",
+    {
+        "name": "Korea Herald",
+        "category": "entertainment",
+        "url": "https://www.koreaherald.com/rss",
+    },
 
-    "https://www.goal.com/feeds/en/news",
+    {
+        "name": "Yonhap Entertainment",
+        "category": "entertainment",
+        "url": "https://en.yna.co.kr/RSS/news.xml",
+    },
 
-    # KOREA
+]
 
-    "https://www.soompi.com/feed",
+# ==========================
+# GOOGLE NEWS
+# ==========================
 
-    "https://www.koreaherald.com/rss",
+GOOGLE_KEYWORDS = [
+
+    # Football
+
+    "Lionel Messi",
+
+    "Cristiano Ronaldo",
+
+    "Erling Haaland",
+
+    "Kylian Mbappe",
+
+    "Manchester United",
+
+    "Liverpool",
+
+    "Barcelona",
+
+    "Real Madrid",
+
+    "Arsenal",
+
+    "Chelsea",
+
+    "Tottenham",
+
+    "Premier League",
+
+    "Champions League",
+
+    # Korea
+
+    "BLACKPINK",
+
+    "BTS",
+
+    "IU",
+
+    "aespa",
+
+    "NewJeans",
+
+    "Korean Drama",
+
+    "Netflix Korea",
+
+    "KPop",
+
+]from __future__ import annotations
+
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+DATA_DIR = BASE_DIR / "data"
+LOG_DIR = BASE_DIR / "logs"
+CACHE_DIR = BASE_DIR / "cache"
+
+DATA_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(exist_ok=True)
+CACHE_DIR.mkdir(exist_ok=True)
+
+# ==========================
+# API
+# ==========================
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+
+FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "")
+
+FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN", "")
+
+# ==========================
+# BOT
+# ==========================
+
+MAX_POST = int(os.getenv("MAX_POST", "1"))
+
+MIN_VIRAL_SCORE = int(os.getenv("MIN_VIRAL_SCORE", "80"))
+
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
+
+MAX_RETRY = int(os.getenv("MAX_RETRY", "3"))
+
+USER_AGENT = (
+    "Mozilla/5.0 "
+    "(Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 "
+    "(KHTML, like Gecko) "
+    "Chrome/138.0 Safari/537.36"
+)
+
+# ==========================
+# RSS
+# ==========================
+
+RSS_FEEDS = [
+
+    {
+        "name": "BBC Football",
+        "category": "football",
+        "url": "https://feeds.bbci.co.uk/sport/football/rss.xml",
+    },
+
+    {
+        "name": "ESPN Soccer",
+        "category": "football",
+        "url": "https://www.espn.com/espn/rss/soccer/news",
+    },
+
+    {
+        "name": "Soompi",
+        "category": "kpop",
+        "url": "https://www.soompi.com/feed",
+    },
+
+    {
+        "name": "Korea Herald",
+        "category": "entertainment",
+        "url": "https://www.koreaherald.com/rss",
+    },
+
+    {
+        "name": "Yonhap Entertainment",
+        "category": "entertainment",
+        "url": "https://en.yna.co.kr/RSS/news.xml",
+    },
+
+]
+
+# ==========================
+# GOOGLE NEWS
+# ==========================
+
+GOOGLE_KEYWORDS = [
+
+    # Football
+
+    "Lionel Messi",
+
+    "Cristiano Ronaldo",
+
+    "Erling Haaland",
+
+    "Kylian Mbappe",
+
+    "Manchester United",
+
+    "Liverpool",
+
+    "Barcelona",
+
+    "Real Madrid",
+
+    "Arsenal",
+
+    "Chelsea",
+
+    "Tottenham",
+
+    "Premier League",
+
+    "Champions League",
+
+    # Korea
+
+    "BLACKPINK",
+
+    "BTS",
+
+    "IU",
+
+    "aespa",
+
+    "NewJeans",
+
+    "Korean Drama",
+
+    "Netflix Korea",
+
+    "KPop",
 
 ]
