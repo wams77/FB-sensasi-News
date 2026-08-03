@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import feedparser
 from bs4 import BeautifulSoup
+from datetime import datetime
 import time
 
 from config import RSS_FEEDS, RSS_LIMIT
@@ -82,15 +83,19 @@ class NewsCollector:
                     soup = BeautifulSoup(summary, "html.parser")
                     summary = soup.get_text().strip()
 
+                # Ambil waktu publikasi atau gunakan waktu saat ini jika tidak ada
+                published = entry.get("published", "") or entry.get("updated", "") or datetime.now().isoformat()
+
                 image_url = self.extract_image(entry)
 
-                # Menggunakan parameter 'link' sesuai definisi di models.py
+                # Menyertakan parameter 'published' yang wajib ada pada model
                 article = NewsArticle(
                     title=title,
                     link=link,
                     summary=summary,
                     category=category,
                     source=name,
+                    published=published,
                     image=image_url,
                 )
                 articles.append(article)
