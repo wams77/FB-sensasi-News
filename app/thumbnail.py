@@ -26,7 +26,6 @@ class ThumbnailGenerator:
 
     def __init__(self):
         self.output = CACHE_DIR / "thumbs"
-        # Pastikan direktori benar-benar dibuat
         self.output.mkdir(
             parents=True,
             exist_ok=True
@@ -134,11 +133,9 @@ class ThumbnailGenerator:
                 .replace("|", "_")
                 + ".jpg"
             )
-            
             output = self.output / filename
             image.save(output, quality=95)
             
-            # Pastikan path disimpan sebagai string yang valid
             article.thumbnail = str(output.resolve())
             logger.info("Thumbnail berhasil disimpan: %s", article.thumbnail)
             return article.thumbnail
