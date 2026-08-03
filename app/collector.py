@@ -95,20 +95,32 @@ RSS_SOURCES = [
     {
         "name": "Yonhap",
 
-        @dataclass
+       @dataclass
 class NewsArticle:
 
-    title: str
+    title:str
 
-    summary: str
+    summary:str
 
-    link: str
+    link:str
 
-    image: Optional[str]
+    image:str|None
 
-    source: str
+    source:str
 
-    category: str
+    category:str
+
+    published:datetime|None
+
+    headline:str=""
+
+    caption:str=""
+
+    hashtags:list=None
+
+    score:int=0
+
+    emoji:str=""
 
     published: Optional[datetime]
         "category": "korea",
