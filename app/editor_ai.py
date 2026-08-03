@@ -1,29 +1,42 @@
+from __future__ import annotations
+
 import json
 from groq import Groq
+
 from config import GROQ_API_KEY
+from logger import logger
+from models import NewsArticle
 
 MODEL = "llama-3.3-70b-versatile"
 
-client = Groq(api_key=GROQ_API_KEY)
-
 SYSTEM_PROMPT = """
-Kamu adalah editor berita profesional.
+Kamu adalah editor media online Indonesia.
 
-Tugasmu membaca SATU berita lalu mengembalikan JSON VALID.
+Tugasmu mengubah SATU berita menjadi posting Facebook yang menarik.
 
-JANGAN gunakan markdown.
-JANGAN gunakan ```.
+ATURAN:
+
+- Jangan mengubah fakta.
+- Jangan membuat berita palsu.
+- Bahasa Indonesia.
+- Headline maksimal 14 kata.
+- Caption maksimal 120 kata.
+- Tambahkan CTA.
+- Maksimal 5 hashtag.
+- Emoji secukupnya.
+
+Balas HARUS berupa JSON VALID.
 
 Schema:
 
 {
     "viral_score":95,
-    "headline":"...",
-    "caption":"...",
+    "priority":1,
+    "headline":"",
+    "caption":"",
     "hashtags":["#Football","#Messi"],
     "category":"football",
-    "emoji":"🔥",
-    "priority":1
+    "emoji":"🔥"
 }
 
 priority:
@@ -33,16 +46,7 @@ priority:
 3 = Normal
 4 = Skip
 
-Aturan:
-
-- Jangan mengubah fakta.
-- Jangan membuat berita palsu.
-- Judul maksimal 14 kata.
-- Caption maksimal 120 kata.
-- Maksimal 5 hashtag.
-- Bahasa Indonesia.
-
-Kategori hanya:
+category:
 
 football
 transfer
@@ -56,42 +60,54 @@ other
 class AIEditor:
 
     def __init__(self):
-        self.client = client
 
-    def build_prompt(self, article):
+        self.client = Groq(
+            api_key=GROQ_API_KEY
+        )
+
+    def build_prompt(
+        self,
+        article: NewsArticle,
+    ) -> str:
 
         return f"""
-TITLE:
+TITLE
 {article.title}
 
-SUMMARY:
+SUMMARY
 {article.summary}
 
-SOURCE:
+SOURCE
 {article.source}
 """
 
-    def analyze(self, article):
+    def analyze(
+        self,
+        article: NewsArticle,
+    ) -> dict:
 
         response = self.client.chat.completions.create(
 
             model=MODEL,
 
-            temperature=0.6,
+            temperature=0.5,
 
             response_format={
                 "type": "json_object"
             },
 
             messages=[
+
                 {
                     "role": "system",
                     "content": SYSTEM_PROMPT
                 },
+
                 {
                     "role": "user",
                     "content": self.build_prompt(article)
                 }
+
             ]
 
         )
@@ -100,22 +116,67 @@ SOURCE:
 
         return json.loads(content)
 
-    def process(self, article):
+    def process(
+        self,
+        article: NewsArticle,
+    ) -> NewsArticle:
 
-        result = self.analyze(article)
+        try:
 
-        article.score = result.get("viral_score", 0)
+            result = self.analyze(
+                article
+            )
 
-        article.headline = result.get("headline", article.title)
+            article.score = int(
+                result.get(
+                    "viral_score",
+                    0
+                )
+            )
 
-        article.caption = result.get("caption", article.summary)
+            article.priority = int(
+                result.get(
+                    "priority",
+                    3
+                )
+            )
 
-        article.hashtags = result.get("hashtags", [])
+            article.headline = result.get(
+                "headline",
+                article.title
+            )
 
-        article.category = result.get("category", "other")
+            article.caption = result.get(
+                "caption",
+                article.summary
+            )
 
-        article.emoji = result.get("emoji", "")
+            article.hashtags = result.get(
+                "hashtags",
+                []
+            )
 
-        article.priority = result.get("priority", 3)
+            article.category = result.get(
+                "category",
+                article.category
+            )
 
-        return article
+            article.emoji = result.get(
+                "emoji",
+                ""
+            )
+
+            return article
+
+        except Exception as e:
+
+            logger.exception(e)
+
+            article.score = 0
+            article.priority = 4
+            article.headline = article.title
+            article.caption = article.summary
+            article.hashtags = []
+            article.emoji = ""
+
+            return article
