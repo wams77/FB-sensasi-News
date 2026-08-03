@@ -9,94 +9,66 @@ client = Groq(api_key=GROQ_API_KEY)
 SYSTEM_PROMPT = """
 Kamu adalah editor berita profesional.
 
-Tugasmu adalah membaca SATU berita.
+Tugasmu membaca SATU berita lalu mengembalikan JSON VALID.
 
-Balas HARUS berupa JSON VALID.
-
-Jangan gunakan markdown.
-
-Jangan gunakan ```json
+JANGAN gunakan markdown.
+JANGAN gunakan ```.
 
 Schema:
 
 {
-"viral_score":0-100,
-"headline":"",
-"caption":"",
-"hashtags":["#A","#B","#C"],
-"category":"",
-"emoji":""
+    "viral_score":95,
+    "headline":"...",
+    "caption":"...",
+    "hashtags":["#Football","#Messi"],
+    "category":"football",
+    "emoji":"🔥",
+    "priority":1
 }
+
+priority:
+
+1 = Breaking
+2 = Viral
+3 = Normal
+4 = Skip
 
 Aturan:
 
-headline maksimal 14 kata.
+- Jangan mengubah fakta.
+- Jangan membuat berita palsu.
+- Judul maksimal 14 kata.
+- Caption maksimal 120 kata.
+- Maksimal 5 hashtag.
+- Bahasa Indonesia.
 
-caption maksimal 120 kata.
-
-Jangan mengubah fakta.
-
-Jangan membuat berita palsu.
-
-Hashtag maksimal 5.
-
-Kategori hanya salah satu:
+Kategori hanya:
 
 football
-
-kpop
-
-drama
-
-entertainment
-
 transfer
-
+kpop
+drama
+entertainment
 other
 """
+
 
 class AIEditor:
 
     def __init__(self):
-
-        self.client = clientclass AIEditor:
-
-    def __init__(self):
-
         self.client = client
 
-      def build_prompt(self, article):
+    def build_prompt(self, article):
 
         return f"""
-
-TITLE
-
+TITLE:
 {article.title}
 
-SUMMARY
-
+SUMMARY:
 {article.summary}
 
-SOURCE
-
+SOURCE:
 {article.source}
-
-"""    def build_prompt(self, article):
-
-        return f"""
-
-TITLE
-
-{article.title}
-
-SUMMARY
-
-{article.summary}
-
-SOURCE
-
-{article.source}
-
 """
 
     def analyze(self, article):
@@ -108,21 +80,18 @@ SOURCE
             temperature=0.6,
 
             response_format={
-                "type":"json_object"
+                "type": "json_object"
             },
 
             messages=[
-
                 {
-                    "role":"system",
-                    "content":SYSTEM_PROMPT
+                    "role": "system",
+                    "content": SYSTEM_PROMPT
                 },
-
                 {
-                    "role":"user",
-                    "content":self.build_prompt(article)
+                    "role": "user",
+                    "content": self.build_prompt(article)
                 }
-
             ]
 
         )
@@ -135,32 +104,18 @@ SOURCE
 
         result = self.analyze(article)
 
-        article.score = result["viral_score"]
+        article.score = result.get("viral_score", 0)
 
-        article.headline = result["headline"]
+        article.headline = result.get("headline", article.title)
 
-        article.caption = result["caption"]
+        article.caption = result.get("caption", article.summary)
 
-        article.hashtags = result["hashtags"]
+        article.hashtags = result.get("hashtags", [])
 
-        article.category = result["category"]
+        article.category = result.get("category", "other")
 
-        article.emoji = result["emoji"]
+        article.emoji = result.get("emoji", "")
 
-        return article    def process(self, article):
-
-        result = self.analyze(article)
-
-        article.score = result["viral_score"]
-
-        article.headline = result["headline"]
-
-        article.caption = result["caption"]
-
-        article.hashtags = result["hashtags"]
-
-        article.category = result["category"]
-
-        article.emoji = result["emoji"]
+        article.priority = result.get("priority", 3)
 
         return article
