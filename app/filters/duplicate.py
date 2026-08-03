@@ -1,1 +1,56 @@
-rapidfuzz==3.14.1
+from __future__ import annotations
+
+from rapidfuzz import fuzz
+
+from models import NewsArticle
+
+
+class DuplicateFilter:
+
+    def __init__(self, similarity: int = 90):
+
+        self.similarity = similarity
+
+    def normalize(self, text: str) -> str:
+
+        return (
+            text.lower()
+            .replace("-", " ")
+            .replace(":", " ")
+            .replace(",", " ")
+            .replace(".", " ")
+            .strip()
+        )
+
+    def is_duplicate(
+        self,
+        article: NewsArticle,
+        accepted,
+    ) -> bool:
+
+        title = self.normalize(article.title)
+
+        for item in accepted:
+
+            score = fuzz.token_sort_ratio(
+                title,
+                self.normalize(item.title)
+            )
+
+            if score >= self.similarity:
+                return True
+
+        return False
+
+    def process(self, articles):
+
+        accepted = []
+
+        for article in articles:
+
+            if self.is_duplicate(article, accepted):
+                continue
+
+            accepted.append(article)
+
+        return accepted
