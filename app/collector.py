@@ -1,283 +1,121 @@
 from __future__ import annotations
 
-import html
-import re
-from datetime import datetime
-from email.utils import parsedate_to_datetime
-from typing import Optional
-
 import feedparser
-import requests
 from bs4 import BeautifulSoup
+from datetime import datetime
+import time
 
-from config import (
-    RSS_FEEDS,
-    GOOGLE_KEYWORDS,
-    USER_AGENT,
-    RSS_LIMIT,
-    GOOGLE_LIMIT,
-    MAX_RETRY,
-    REQUEST_TIMEOUT,
-)
+from config import RSS_FEEDS, RSS_LIMIT, USER_AGENT
 from logger import logger
 from models import NewsArticle
-
-
-HEADERS = {
-    "User-Agent": USER_AGENT
-}
 
 
 class NewsCollector:
 
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update(
-            HEADERS
-        )
+        self.feeds = RSS_FEEDS
 
-    def google_news_url(
-        self,
-        keyword: str,
-    ) -> str:
-        keyword = keyword.replace(
-            " ",
-            "+",
-        )
-        return (
-            "https://news.google.com/rss/search?"
-            f"q={keyword}"
-            "&hl=en-US"
-            "&gl=US"
-            "&ceid=US:en"
-        )
-
-    def google_feeds(self):
-        feeds = []
-        for keyword in GOOGLE_KEYWORDS:
-            feeds.append({
-                "name": f"Google News ({keyword})",
-                "category": "google",
-                "url": self.google_news_url(
-                    keyword
-                ),
-                "limit": GOOGLE_LIMIT,
-            })
-        return feeds
-
-    def clean_html(
-        self,
-        text: str,
-    ) -> str:
-        if not text:
-            return ""
-        text = html.unescape(
-            text
-        )
-        soup = BeautifulSoup(
-            text,
-            "html.parser",
-        )
-        text = soup.get_text(
-            " ",
-            strip=True,
-        )
-        text = re.sub(
-            r"\s+",
-            " ",
-            text,
-        )
-        return text.strip()
-
-    def parse_date(
-        self,
-        value: str,
-    ) -> Optional[datetime]:
-        if not value:
-            return None
+    def extract_image(self, entry) -> str | None:
+        """Mengekstrak URL gambar asli dari berbagai format tag RSS feed."""
         try:
-            return parsedate_to_datetime(
-                value
-            )
-        except Exception:
-            return None
+            # 1. Cek media:content
+            if hasattr(entry, "media_content") and entry.media_content:
+                for media in entry.media_content:
+                    url = media.get("url")
+                    if url and any(ext in url.lower() for ext in [".jpg", ".jpeg", ".png", ".webp"]):
+                        return url
 
-    def extract_image(
-        self,
-        entry,
-    ) -> Optional[str]:
-        if hasattr(
-            entry,
-            "media_content",
-        ):
-            media = entry.media_content
-            if media:
-                return media[0].get(
-                    "url"
-                )
-        if hasattr(
-            entry,
-            "media_thumbnail",
-        ):
-            media = entry.media_thumbnail
-            if media:
-                return media[0].get(
-                    "url"
-                )
-        summary = entry.get(
-            "summary",
-            "",
-        )
-        if summary:
-            soup = BeautifulSoup(
-                summary,
-                "html.parser",
-            )
-            img = soup.find(
-                "img"
-            )
-            if img:
-                return img.get(
-                    "src"
-                )
+            # 2. Cek media:thumbnail
+            if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+                for thumb in entry.media_thumbnail:
+                    url = thumb.get("url")
+                    if url:
+                        return url
+
+            # 3. Cek enclosures (lampiran file/gambar)
+            if hasattr(entry, "enclosures") and entry.enclosures:
+                for enc in entry.enclosures:
+                    if "image" in enc.get("type", ""):
+                        return enc.get("href")
+
+            # 4. Cari tag <img> di dalam content atau summary/description
+            content_html = ""
+            if hasattr(entry, "content") and entry.content:
+                content_html = entry.content[0].get("value", "")
+            elif hasattr(entry, "summary"):
+                content_html = entry.summary
+            elif hasattr(entry, "description"):
+                content_html = entry.description
+
+            if content_html:
+                soup = BeautifulSoup(content_html, "html.parser")
+                img_tag = soup.find("img")
+                if img_tag and img_tag.get("src"):
+                    return img_tag.get("src")
+
+        except Exception as e:
+            logger.warning("Gagal mengekstrak gambar dari entry RSS: %s", e)
+
         return None
 
-    def fetch_feed(
-        self,
-        url: str,
-    ):
-        for _ in range(
-            MAX_RETRY
-        ):
-            try:
-                logger.info(
-                    "Fetch %s",
-                    url,
-                )
-                return feedparser.parse(
-                    url
-                )
-            except Exception as e:
-                logger.exception(
-                    e
-                )
-        return None
-
-    def normalize(
-        self,
-        entry,
-        source,
-    ) -> NewsArticle:
-        return NewsArticle(
-            title=entry.get(
-                "title",
-                "",
-            ).strip(),
-            summary=self.clean_html(
-                entry.get(
-                    "summary",
-                    "",
-                )
-            ),
-            link=entry.get(
-                "link",
-                "",
-            ),
-            image=self.extract_image(
-                entry
-            ),
-            source=source["name"],
-            category=source["category"],
-            published=self.parse_date(
-                entry.get(
-                    "published",
-                    "",
-                )
-            ),
-        )
-
-    def collect_feed(
-        self,
-        source,
-    ):
+    def fetch_feed(self, feed_info: dict) -> list[NewsArticle]:
         articles = []
-        feed = self.fetch_feed(
-            source["url"]
-        )
-        if not feed:
-            return articles
-        limit = source.get(
-            "limit",
-            RSS_LIMIT,
-        )
-        logger.info(
-            "%s : %s",
-            source["name"],
-            len(feed.entries),
-        )
-        for entry in feed.entries[:limit]:
-            try:
-                articles.append(
-                    self.normalize(
-                        entry,
-                        source,
-                    )
+        name = feed_info["name"]
+        category = feed_info["category"]
+        url = feed_info["url"]
+
+        try:
+            logger.info("Mengambil RSS dari: %s (%s)", name, url)
+            
+            # Menggunakan feedparser dengan parsing standar
+            parsed = feedparser.parse(url)
+
+            if not parsed.entries:
+                logger.warning("Tidak ada entri ditemukan pada feed: %s", name)
+                return articles
+
+            # Batasi jumlah artikel per feed sesuai konfigurasi
+            entries = parsed.entries[:RSS_LIMIT]
+
+            for entry in entries:
+                title = entry.get("title", "").strip()
+                link = entry.get("link", "").strip()
+                
+                if not title or not link:
+                    continue
+
+                # Ambil ringkasan/deskripsi
+                summary = entry.get("summary", "") or entry.get("description", "")
+                if summary:
+                    soup = BeautifulSoup(summary, "html.parser")
+                    summary = soup.get_text().strip()
+
+                # Ekstrak gambar asli
+                image_url = self.extract_image(entry)
+
+                article = NewsArticle(
+                    title=title,
+                    url=link,
+                    summary=summary,
+                    category=category,
+                    source=name,
+                    image=image_url,
                 )
-            except Exception as e:
-                logger.exception(
-                    e
-                )
+                articles.append(article)
+
+        except Exception as e:
+            logger.error("Error saat mengambil feed %s: %s", name, e)
+
+        logger.info("Berhasil mengumpulkan %d artikel dari %s", len(articles), name)
         return articles
 
-    def collect(self):
-        articles = []
-        feeds = []
-        for feed in RSS_FEEDS:
-            feed = dict(feed)
-            feed["limit"] = RSS_LIMIT
-            feeds.append(feed)
-        feeds.extend(
-            self.google_feeds()
-        )
-        logger.info(
-            "Total Feeds : %s",
-            len(feeds),
-        )
-        for feed in feeds:
-            logger.info(
-                "Feed : %s",
-                feed["name"],
-            )
-            articles.extend(
-                self.collect_feed(
-                    feed
-                )
-            )
-        logger.info(
-            "Collected : %s Articles",
-            len(articles),
-        )
-        articles.sort(
-            key=lambda x: (
-                x.published
-                or datetime.min
-            ),
-            reverse=True,
-        )
-        return articles
+    def collect_all(self) -> list[NewsArticle]:
+        all_articles = []
+        
+        for feed in self.feeds:
+            articles = self.fetch_feed(feed)
+            all_articles.extend(articles)
+            time.sleep(1) # Jeda singkat antar feed untuk mencegah rate-limit
 
-
-if __name__ == "__main__":
-    collector = NewsCollector()
-    articles = collector.collect()
-    print()
-    print(
-        "TOTAL:",
-        len(articles)
-    )
-    print()
-    for article in articles[:10]:
-        print(
-            article.published,
-            article.title,
-        )
+        logger.info("Total keseluruhan artikel terkumpul: %d", len(all_articles))
+        return all_articles
