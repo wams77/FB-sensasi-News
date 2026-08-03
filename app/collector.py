@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import feedparser
 from bs4 import BeautifulSoup
-from datetime import datetime
 import time
 
-from config import RSS_FEEDS, RSS_LIMIT, USER_AGENT
+from config import RSS_FEEDS, RSS_LIMIT
 from logger import logger
 from models import NewsArticle
 
@@ -67,14 +66,12 @@ class NewsCollector:
         try:
             logger.info("Mengambil RSS dari: %s (%s)", name, url)
             
-            # Menggunakan feedparser dengan parsing standar
             parsed = feedparser.parse(url)
 
             if not parsed.entries:
                 logger.warning("Tidak ada entri ditemukan pada feed: %s", name)
                 return articles
 
-            # Batasi jumlah artikel per feed sesuai konfigurasi
             entries = parsed.entries[:RSS_LIMIT]
 
             for entry in entries:
@@ -84,13 +81,11 @@ class NewsCollector:
                 if not title or not link:
                     continue
 
-                # Ambil ringkasan/deskripsi
                 summary = entry.get("summary", "") or entry.get("description", "")
                 if summary:
                     soup = BeautifulSoup(summary, "html.parser")
                     summary = soup.get_text().strip()
 
-                # Ekstrak gambar asli
                 image_url = self.extract_image(entry)
 
                 article = NewsArticle(
@@ -115,7 +110,11 @@ class NewsCollector:
         for feed in self.feeds:
             articles = self.fetch_feed(feed)
             all_articles.extend(articles)
-            time.sleep(1) # Jeda singkat antar feed untuk mencegah rate-limit
+            time.sleep(1)
 
         logger.info("Total keseluruhan artikel terkumpul: %d", len(all_articles))
         return all_articles
+
+    def collect(self) -> list[NewsArticle]:
+        """Alias untuk collect_all agar kompatibel dengan bot.py"""
+        return self.collect_all()
