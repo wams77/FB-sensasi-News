@@ -65,7 +65,6 @@ class NewsBot:
         self,
         article,
     ) -> bool:
-        # 1. Cek riwayat terlebih dahulu untuk menghindari pemanggilan AI berulang pada berita yang sama
         if self.history.exists(
             article.link
         ):
@@ -75,12 +74,10 @@ class NewsBot:
             )
             return False
 
-        # 2. Proses analisis menggunakan AI Editor
         article = self.editor.process(
             article
         )
 
-        # 3. Cek prioritas (jika 4, berarti dilewati)
         if article.priority == 4:
             logger.info(
                 "Priority Skip : %s",
@@ -88,7 +85,6 @@ class NewsBot:
             )
             return False
 
-        # 4. Cek skor viral minimum
         if article.score < MIN_VIRAL_SCORE:
             logger.info(
                 "Score Skip : %s (%s)",
@@ -97,7 +93,6 @@ class NewsBot:
             )
             return False
 
-        # 5. Publikasikan ke halaman Facebook
         post_id = self.facebook.publish(
             article
         )
@@ -109,7 +104,6 @@ class NewsBot:
             )
             return False
 
-        # 6. Simpan ke history jika berhasil diposting
         self.history.add(
             article.link
         )
