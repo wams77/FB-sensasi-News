@@ -52,7 +52,7 @@ MAX_POST = int(
 
         "MAX_POST",
 
-        "1",
+        "3",
 
     )
 
