@@ -1,78 +1,144 @@
+from __future__ import annotations
+
 from collector import NewsCollector
-from duplicate import DuplicateRemover
-from scorer import ViralScorer
-from ai import AIWriter
-from history import History
+from editor_ai import AIEditor
 from facebook import FacebookPublisher
-from config import MIN_SCORE, MAX_POST
+from history import History
+
+from config import (
+    MAX_POST,
+    MIN_VIRAL_SCORE,
+)
+
+from logger import logger
 
 
-collector = NewsCollector()
+class NewsBot:
 
-duplicate = DuplicateRemover()
+    def __init__(self):
 
-scorer = ViralScorer()
+        self.collector = NewsCollector()
 
-writer = AIWriter()
+        self.editor = AIEditor()
 
-history = History()
+        self.facebook = FacebookPublisher()
 
-facebook = FacebookPublisher()
+        self.history = History()
 
+    def should_skip(self, article):
 
-def run():
+        if self.history.exists(article.link):
 
-    print("Collecting News...")
+            logger.info(
+                "Skip History : %s",
+                article.title
+            )
 
-    news = collector.collect()
+            return True
 
-    print(f"Collected {len(news)} Articles")
+        if article.priority == 4:
 
-    news = duplicate.process(news)
+            logger.info(
+                "Skip Priority : %s",
+                article.title
+            )
 
-    print(f"Unique {len(news)} Articles")
+            return True
 
-    news = scorer.process(news)
+        if article.score < MIN_VIRAL_SCORE:
 
-    posted = 0
+            logger.info(
+                "Skip Score : %s (%s)",
+                article.title,
+                article.score
+            )
 
-    for article in news:
+            return True
 
-        if posted >= MAX_POST:
-            break
+        return False
 
-        if article["score"] < MIN_SCORE:
-            continue
+    def process_article(self, article):
 
-        if history.exists(article["link"]):
-            continue
-
-        print(article["title"])
-
-        text = writer.rewrite(article)
-
-        message = f"""{text}
-
-📰 Sumber:
-{article['source']}
-
-🔗 {article['link']}
-"""
-
-        ok = facebook.publish(
-            message,
-            article["link"]
+        article = self.editor.process(
+            article
         )
 
-        if ok:
+        if self.should_skip(article):
 
-            history.add(article["link"])
+            return False
 
-            posted += 1
+        post_id = self.facebook.publish(
+            article
+        )
 
-            print("Posted")
+        if not post_id:
+
+            logger.error(
+                "Facebook Failed : %s",
+                article.title
+            )
+
+            return False
+
+        self.history.add(
+            article.link
+        )
+
+        logger.info(
+            "Posted : %s",
+            article.title
+        )
+
+        return True
+
+    def run(self):
+
+        logger.info(
+            "=" * 60
+        )
+
+        logger.info(
+            "Sensasi News Bot Started"
+        )
+
+        articles = self.collector.collect()
+
+        logger.info(
+            "Articles : %s",
+            len(articles)
+        )
+
+        posted = 0
+
+        for article in articles:
+
+            if posted >= MAX_POST:
+                break
+
+            try:
+
+                success = self.process_article(
+                    article
+                )
+
+                if success:
+
+                    posted += 1
+
+            except Exception as e:
+
+                logger.exception(e)
+
+        logger.info(
+            "Total Posted : %s",
+            posted
+        )
+
+        logger.info(
+            "=" * 60
+        )
 
 
 if __name__ == "__main__":
 
-    run()
+    NewsBot().run()
