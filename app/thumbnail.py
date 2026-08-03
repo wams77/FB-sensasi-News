@@ -27,23 +27,32 @@ class ThumbnailGenerator:
         self.output.mkdir(
             exist_ok=True
         )
-        self.title_font = ImageFont.truetype(
-            "assets/fonts/Poppins-Bold.ttf",
-            58
-        )
-        self.brand_font = ImageFont.truetype(
-            "assets/fonts/Poppins-Bold.ttf",
-            30
-        )
-        self.label_font = ImageFont.truetype(
-            "assets/fonts/Poppins-Bold.ttf",
-            26
-        )
+        try:
+            self.title_font = ImageFont.truetype(
+                "assets/fonts/Poppins-Bold.ttf",
+                58
+            )
+            self.brand_font = ImageFont.truetype(
+                "assets/fonts/Poppins-Bold.ttf",
+                30
+            )
+            self.label_font = ImageFont.truetype(
+                "assets/fonts/Poppins-Bold.ttf",
+                26
+            )
+        except Exception:
+            # Fallback font bawaan jika file font tidak ditemukan
+            self.title_font = ImageFont.load_default()
+            self.brand_font = ImageFont.load_default()
+            self.label_font = ImageFont.load_default()
 
     def download_image(
         self,
-        url: str,
+        url: str | None,
     ):
+        if not url:
+            raise ValueError("Image URL is empty")
+        
         r = requests.get(
             url,
             timeout=30,
@@ -62,7 +71,7 @@ class ThumbnailGenerator:
         overlay = Image.new(
             "RGBA",
             image.size,
-            (0, 0, 0, 120)
+            (0, 0, 0, 140)
         )
         image = image.convert(
             "RGBA"
@@ -113,15 +122,19 @@ class ThumbnailGenerator:
         article: NewsArticle,
     ) -> str:
         try:
-            image = self.download_image(
-                article.image
-            )
-            image = self.fit_image(
-                image
-            )
-            image = self.dark_overlay(
-                image
-            )
+            image = None
+            if article.image:
+                try:
+                    image = self.download_image(article.image)
+                    image = self.fit_image(image)
+                    image = self.dark_overlay(image)
+                except Exception as img_err:
+                    logger.warning("Gagal unduh gambar asli (%s), menggunakan background default.", img_err)
+
+            # Fallback jika gambar gagal diunduh atau tidak ada
+            if image is None:
+                image = Image.new("RGB", (WIDTH, HEIGHT), color=(20, 24, 33))
+
             draw = ImageDraw.Draw(
                 image
             )
@@ -146,8 +159,9 @@ class ThumbnailGenerator:
                 fill="white",
             )
             # TITLE
+            headline_text = article.headline or article.title or "Berita Terbaru"
             title = fill(
-                article.headline,
+                headline_text,
                 width=26,
             )
             draw.multiline_text(
@@ -170,8 +184,10 @@ class ThumbnailGenerator:
                 font=self.brand_font,
                 fill="white",
             )
+            
+            safe_title = article.title if article.title else "news_article"
             filename = (
-                article.title[:40]
+                safe_title[:40]
                 .replace("/", "_")
                 .replace("\\", "_")
                 .replace(":", "_")
