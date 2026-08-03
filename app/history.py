@@ -1,43 +1,58 @@
 import json
-import os
+from pathlib import Path
 
-FILE = "data/history.json"
+FILE = Path("data/history.json")
 
 
 class History:
 
     def __init__(self):
 
-        os.makedirs("data", exist_ok=True)
+        FILE.parent.mkdir(exist_ok=True)
 
-        if not os.path.exists(FILE):
-
-            with open(FILE, "w") as f:
-
-                json.dump([], f)
+        if not FILE.exists():
+            FILE.write_text("[]", encoding="utf-8")
 
     def load(self):
 
-        with open(FILE, "r", encoding="utf8") as f:
+        return json.loads(
 
-            return json.load(f)
+            FILE.read_text(
+
+                encoding="utf-8"
+
+            )
+
+        )
 
     def save(self, data):
 
-        with open(FILE, "w", encoding="utf8") as f:
+        FILE.write_text(
 
-            json.dump(data, f, indent=4)
+            json.dumps(
 
-    def exists(self, link):
+                data,
 
-        return link in self.load()
+                indent=2,
 
-    def add(self, link):
+                ensure_ascii=False
 
-        data = self.load()
+            ),
 
-        data.append(link)
+            encoding="utf-8"
 
-        data = data[-500:]
+        )
 
-        self.save(data)
+    def exists(self, url):
+
+        return url in self.load()
+
+    def add(self, url):
+
+        history = self.load()
+
+        history.append(url)
+
+        history = history[-1000:]
+
+        self.save(history)
