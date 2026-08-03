@@ -7,7 +7,7 @@ from io import BytesIO
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
-from config import CACHE_DIR, DEEPAI_API_KEY
+from config import CACHE_DIR
 from logger import logger
 from models import NewsArticle
 
@@ -29,43 +29,19 @@ class ThumbnailGenerator:
             self.brand_font = ImageFont.load_default()
             self.label_font = ImageFont.load_default()
 
-    def generate_ai_image(self, headline: str, category: str) -> Image.Image | None:
+    def download_image(self, image_url: str | None) -> Image.Image | None:
+        if not image_url:
+            return None
         try:
-            clean_headline = headline.encode("ascii", "ignore").decode("ascii")
-            if not clean_headline.strip():
-                clean_headline = "breaking news update"
-
-            prompt = (
-                f"Classic satirical comic caricature illustration about {clean_headline}, "
-                f"bold black outlines, retro vintage earthy color palette, expressive storytelling"
-            )
-
-            logger.info("Membuat gambar karikatur via DeepAI: %s", clean_headline[:30])
-
-            # Menggunakan DeepAI Text-to-Image API
-            response = requests.post(
-                "https://api.deepai.org/api/text-to-image",
-                data={
-                    "text": prompt,
-                    "grid_size": "1",
-                },
-                headers={
-                    "api-key": DEEPAI_API_KEY
-                },
-                timeout=60,
-            )
-
+            logger.info("Mengunduh gambar asli dari berita: %s", image_url[:50])
+            response = requests.get(image_url, timeout=15)
             if response.status_code == 200:
-                result = response.json()
-                image_url = result.get("output_url")
-                if image_url:
-                    img_resp = requests.get(image_url, timeout=30)
-                    if img_resp.status_code == 200:
-                        return Image.open(BytesIO(img_resp.content)).convert("RGB")
-            else:
-                logger.warning("DeepAI merespon dengan status code: %s - %s", response.status_code, response.text)
+                img = Image.open(BytesIO(response.content)).convert("RGB")
+                # Resize agar pas dengan dimensi standar (crop/fit ke 1200x630)
+                img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+                return img
         except Exception as e:
-            logger.warning("Gagal membuat gambar dari DeepAI: %s", e)
+            logger.warning("Gagal mendownload gambar asli: %s", e)
         return None
 
     def dark_overlay(self, image):
@@ -76,15 +52,14 @@ class ThumbnailGenerator:
 
     def generate(self, article: NewsArticle) -> str:
         try:
-            image = None
             headline_text = article.headline or article.title or "Breaking News"
             
-            # Coba buat gambar via DeepAI
-            image = self.generate_ai_image(headline_text, article.category)
+            # Coba ambil gambar asli dari artikel
+            image = self.download_image(article.image)
             
-            # Fallback jika AI gagal (latar belakang warna gelap elegan)
+            # Fallback jika berita tidak punya gambar (latar belakang warna gelap elegan)
             if image is None:
-                logger.info("Menggunakan background warna solid sebagai fallback thumbnail.")
+                logger.info("Gambar berita tidak ditemukan, menggunakan background solid.")
                 image = Image.new("RGB", (WIDTH, HEIGHT), color=(15, 23, 42))
 
             image = self.dark_overlay(image)
@@ -139,7 +114,7 @@ class ThumbnailGenerator:
             image.save(output, quality=95)
             
             article.thumbnail = str(output.resolve())
-            logger.info("Thumbnail karikatur DeepAI berhasil disimpan: %s", article.thumbnail)
+            logger.info("Thumbnail dari gambar asli berhasil disimpan: %s", article.thumbnail)
             return article.thumbnail
             
         except Exception as e:
