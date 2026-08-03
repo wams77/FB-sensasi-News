@@ -84,28 +84,15 @@ class NewsCollector:
 
                 image_url = self.extract_image(entry)
 
-                # Menyesuaikan parameter dengan menggunakan 'link' atau 'url' sesuai model asli Anda.
-                # Jika model Anda menggunakan 'link', ubah 'url=link' menjadi 'link=link'.
-                try:
-                    article = NewsArticle(
-                        title=title,
-                        link=link,
-                        summary=summary,
-                        category=category,
-                        source=name,
-                        image=image_url,
-                    )
-                except TypeError:
-                    # Fallback jika model menggunakan parameter 'url'
-                    article = NewsArticle(
-                        title=title,
-                        url=link,
-                        summary=summary,
-                        category=category,
-                        source=name,
-                        image=image_url,
-                    )
-
+                # Menggunakan parameter 'link' sesuai definisi di models.py
+                article = NewsArticle(
+                    title=title,
+                    link=link,
+                    summary=summary,
+                    category=category,
+                    source=name,
+                    image=image_url,
+                )
                 articles.append(article)
 
         except Exception as e:
