@@ -54,16 +54,19 @@ class ThumbnailGenerator:
             if not clean_headline.strip():
                 clean_headline = "breaking news update"
                 
-            prompt = f"Cinematic professional news background about {clean_headline}, category {category}, high quality"
+            # Mengubah prompt agar Pollinations AI menghasilkan gaya karikatur digital art yang ekspresif
+            prompt = f"Expressive digital caricature art illustration about {clean_headline}, vibrant colors, dynamic caricature style, high quality news graphic"
             encoded_prompt = quote(prompt)
             ai_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={WIDTH}&height={HEIGHT}&nologo=true&seed=42"
             
-            logger.info("Membuat gambar AI via Pollinations: %s", clean_headline[:30])
+            logger.info("Membuat gambar karikatur AI via Pollinations: %s", clean_headline[:30])
             r = requests.get(ai_url, timeout=30)
             if r.status_code == 200:
                 return Image.open(BytesIO(r.content)).convert("RGB")
+            else:
+                logger.warning("Pollinations AI merespon dengan status code: %s", r.status_code)
         except Exception as e:
-            logger.warning("Gagal membuat gambar AI dari Pollinations: %s", e)
+            logger.warning("Gagal membuat gambar karikatur AI dari Pollinations: %s", e)
         return None
 
     def dark_overlay(self, image):
@@ -77,7 +80,7 @@ class ThumbnailGenerator:
             image = None
             headline_text = article.headline or article.title or "Breaking News"
             
-            # Coba buat gambar via Pollinations AI
+            # Coba buat gambar karikatur via Pollinations AI
             image = self.generate_ai_image(headline_text, article.category)
             
             # Fallback jika AI gagal (latar belakang warna gelap elegan)
@@ -137,7 +140,7 @@ class ThumbnailGenerator:
             image.save(output, quality=95)
             
             article.thumbnail = str(output.resolve())
-            logger.info("Thumbnail berhasil disimpan: %s", article.thumbnail)
+            logger.info("Thumbnail karikatur berhasil disimpan: %s", article.thumbnail)
             return article.thumbnail
             
         except Exception as e:
