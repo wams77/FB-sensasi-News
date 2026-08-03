@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import requests
 
 from config import (
     FACEBOOK_ACCESS_TOKEN,
     FACEBOOK_PAGE_ID,
-    MAX_RETRY,
     REQUEST_TIMEOUT,
+    MAX_RETRY,
 )
 
 from logger import logger
 from models import NewsArticle
+from post_builder import PostBuilder
 
 
 GRAPH_URL = "https://graph.facebook.com/v23.0"
@@ -22,30 +24,69 @@ class FacebookPublisher:
 
     def __init__(self):
 
-        self.photo_url = (
+        self.builder = PostBuilder()
+
+        self.photo_endpoint = (
             f"{GRAPH_URL}/{FACEBOOK_PAGE_ID}/photos"
         )
 
-    def request(
+    def upload_photo(
+
         self,
-        payload: dict,
+
+        image_path: str,
+
+        caption: str,
+
     ):
 
-        payload["access_token"] = FACEBOOK_ACCESS_TOKEN
+        image = Path(image_path)
+
+        if not image.exists():
+
+            logger.error(
+
+                "Image not found : %s",
+
+                image_path,
+
+            )
+
+            return None
 
         for _ in range(MAX_RETRY):
 
             try:
 
-                response = requests.post(
+                with open(image, "rb") as fp:
 
-                    self.photo_url,
+                    files = {
 
-                    data=payload,
+                        "source": fp
 
-                    timeout=REQUEST_TIMEOUT,
+                    }
 
-                )
+                    data = {
+
+                        "caption": caption,
+
+                        "published": "true",
+
+                        "access_token": FACEBOOK_ACCESS_TOKEN,
+
+                    }
+
+                    response = requests.post(
+
+                        self.photo_endpoint,
+
+                        files=files,
+
+                        data=data,
+
+                        timeout=REQUEST_TIMEOUT,
+
+                    )
 
                 logger.info(
 
@@ -64,61 +105,43 @@ class FacebookPublisher:
             time.sleep(2)
 
         return None
+            def publish(
 
-    def build_caption(
         self,
+
         article: NewsArticle,
-    ) -> str:
 
-        hashtags = " ".join(
-            article.hashtags
-        )
+    ) -> str | None:
 
-        caption = f"""{article.emoji} {article.headline}
+        if not article.thumbnail:
 
-{article.article}
+            logger.error(
 
-{hashtags}
+                "Thumbnail not found."
 
-━━━━━━━━━━━━━━
-📢 Ikuti Gosip.ID untuk berita olahraga & hiburan terbaru.
-"""
+            )
 
-        return caption.strip()
+            return None
 
-    def publish(
-        self,
-        article: NewsArticle,
-    ):
+        caption = self.builder.build(
 
-                caption = self.build_caption(
             article
+
         )
 
-        payload = {
+        result = self.upload_photo(
 
-            # Upload foto dari URL RSS
-            "url": article.image,
+            article.thumbnail,
 
-            # Artikel hasil AI
-            "caption": caption,
+            caption,
 
-            # Pastikan muncul di timeline
-            "published": "true",
-
-        }
-
-        result = self.request(
-            payload
         )
 
         if not result:
 
             logger.error(
 
-                "Facebook Failed : %s",
-
-                article.title,
+                "Facebook upload failed."
 
             )
 
@@ -132,7 +155,11 @@ class FacebookPublisher:
 
         )
 
-        article.facebook_post_id = post_id
+        article.facebook_post_id = (
+
+            post_id
+
+        )
 
         article.posted = True
 
@@ -140,14 +167,12 @@ class FacebookPublisher:
 
             "Facebook Success : %s",
 
-            article.title,
+            post_id,
 
         )
 
         return post_id
-
-
-if __name__ == "__main__":
+        if __name__ == "__main__":
 
     article = NewsArticle(
 
@@ -155,11 +180,11 @@ if __name__ == "__main__":
 
         summary="",
 
-        link="",
+        link="https://example.com",
 
         image="https://picsum.photos/1200/630",
 
-        source="Test",
+        source="BBC",
 
         category="football",
 
@@ -167,24 +192,52 @@ if __name__ == "__main__":
 
     )
 
-    article.headline = "Judul Berita"
+    article.headline = (
+
+        "Arsenal Dapat Angin Segar"
+
+    )
 
     article.article = (
-        "Ini adalah artikel hasil AI. "
-        "Artikel ini hanya digunakan "
-        "untuk pengujian upload ke Facebook."
+
+        "Arsenal mendapatkan kabar baik menjelang musim baru. "
+
+        "Pemain andalan mereka dipastikan kembali mengikuti "
+
+        "latihan penuh bersama skuad utama setelah pulih dari "
+
+        "cedera. Kehadiran sang pemain diharapkan mampu "
+
+        "meningkatkan performa tim dalam persaingan musim ini."
+
     )
 
     article.hashtags = [
 
-        "#Football",
+        "#Arsenal",
 
-        "#Breaking",
+        "#PremierLeague",
+
+        "#Football",
 
     ]
 
     article.emoji = "🔥"
 
-    FacebookPublisher().publish(
+    article.thumbnail = "cache/thumbs/test.jpg"
+
+    publisher = FacebookPublisher()
+
+    post_id = publisher.publish(
+
         article
+
+    )
+
+    print(
+
+        "POST ID:",
+
+        post_id
+
     )
