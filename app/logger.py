@@ -1,42 +1,68 @@
+from __future__ import annotations
+
 import logging
+import sys
 from pathlib import Path
 
-
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
-
-LOG_FILE = LOG_DIR / "newsbot.log"
+from config import LOG_DIR
 
 
-def setup_logger():
-
-    logger = logging.getLogger("newsbot")
-
-    if logger.handlers:
-        return logger
-
-    logger.setLevel(logging.INFO)
-
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(message)s"
-    )
-
-    file_handler = logging.FileHandler(
-        LOG_FILE,
-        encoding="utf-8"
-    )
-
-    file_handler.setFormatter(formatter)
-
-    console_handler = logging.StreamHandler()
-
-    console_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-
-    logger.addHandler(console_handler)
-
-    return logger
+LOG_FILE = Path(LOG_DIR) / "bot.log"
 
 
-logger = setup_logger()
+logger = logging.getLogger("SensasiNews")
+
+logger.setLevel(logging.INFO)
+
+logger.handlers.clear()
+
+
+formatter = logging.Formatter(
+
+    "%(asctime)s | %(levelname)s | %(message)s"
+
+)
+
+
+console = logging.StreamHandler(
+
+    sys.stdout
+
+)
+
+console.setFormatter(
+
+    formatter
+
+)
+
+
+file_handler = logging.FileHandler(
+
+    LOG_FILE,
+
+    encoding="utf-8",
+
+)
+
+file_handler.setFormatter(
+
+    formatter
+
+)
+
+
+logger.addHandler(
+
+    console
+
+)
+
+logger.addHandler(
+
+    file_handler
+
+)
+
+
+logger.propagate = False
