@@ -124,17 +124,16 @@ RSS_FEEDS = [
         "url": "https://www.soompi.com/feed",
     },
     {
-        "name": "Korea Herald",
-        "category": "entertainment",
-        "url": "https://www.koreaherald.com/rss",
+        "name": "Korea Herald K-Pop",
+        "category": "kpop",
+        "url": "https://www.koreaherald.com/rss/kh_Kpop",
     },
     {
-        "name": "Yonhap Entertainment",
+        "name": "Korea Herald Life & Culture",
         "category": "entertainment",
-        "url": "https://en.yna.co.kr/RSS/news.xml",
+        "url": "https://www.koreaherald.com/rss/kh_LifenCulture",
     },
 ]
-
 
 # ============================================
 # GOOGLE NEWS KEYWORDS
