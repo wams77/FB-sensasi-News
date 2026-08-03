@@ -2,21 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import fill
-from urllib.parse import quote
 from io import BytesIO
 
 import requests
+from PIL import Image, ImageDraw, ImageFont
 
-from PIL import (
-    Image,
-    ImageDraw,
-    ImageFont,
-)
-
-from config import CACHE_DIR
+from config import CACHE_DIR, DEEPAI_API_KEY
 from logger import logger
 from models import NewsArticle
-
 
 WIDTH = 1200
 HEIGHT = 630
@@ -26,23 +19,11 @@ class ThumbnailGenerator:
 
     def __init__(self):
         self.output = CACHE_DIR / "thumbs"
-        self.output.mkdir(
-            parents=True,
-            exist_ok=True
-        )
+        self.output.mkdir(parents=True, exist_ok=True)
         try:
-            self.title_font = ImageFont.truetype(
-                "assets/fonts/Poppins-Bold.ttf",
-                58
-            )
-            self.brand_font = ImageFont.truetype(
-                "assets/fonts/Poppins-Bold.ttf",
-                30
-            )
-            self.label_font = ImageFont.truetype(
-                "assets/fonts/Poppins-Bold.ttf",
-                26
-            )
+            self.title_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 58)
+            self.brand_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 30)
+            self.label_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 26)
         except Exception:
             self.title_font = ImageFont.load_default()
             self.brand_font = ImageFont.load_default()
@@ -53,20 +34,38 @@ class ThumbnailGenerator:
             clean_headline = headline.encode("ascii", "ignore").decode("ascii")
             if not clean_headline.strip():
                 clean_headline = "breaking news update"
-                
-            # Menggunakan prompt gaya ilustrasi karikatur komik satir klasik sesuai referensi
-            prompt = f"Classic satirical comic caricature illustration about {clean_headline}, bold black outlines, retro vintage earthy color palette, expressive storytelling art style, high quality"
-            encoded_prompt = quote(prompt)
-            ai_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={WIDTH}&height={HEIGHT}&nologo=true&seed=42"
-            
-            logger.info("Membuat gambar karikatur satir via Pollinations: %s", clean_headline[:30])
-            r = requests.get(ai_url, timeout=30)
-            if r.status_code == 200:
-                return Image.open(BytesIO(r.content)).convert("RGB")
+
+            prompt = (
+                f"Classic satirical comic caricature illustration about {clean_headline}, "
+                f"bold black outlines, retro vintage earthy color palette, expressive storytelling"
+            )
+
+            logger.info("Membuat gambar karikatur via DeepAI: %s", clean_headline[:30])
+
+            # Menggunakan DeepAI Text-to-Image API
+            response = requests.post(
+                "https://api.deepai.org/api/text-to-image",
+                data={
+                    "text": prompt,
+                    "grid_size": "1",
+                },
+                headers={
+                    "api-key": DEEPAI_API_KEY
+                },
+                timeout=60,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                image_url = result.get("output_url")
+                if image_url:
+                    img_resp = requests.get(image_url, timeout=30)
+                    if img_resp.status_code == 200:
+                        return Image.open(BytesIO(img_resp.content)).convert("RGB")
             else:
-                logger.warning("Pollinations AI merespon dengan status code: %s", r.status_code)
+                logger.warning("DeepAI merespon dengan status code: %s - %s", response.status_code, response.text)
         except Exception as e:
-            logger.warning("Gagal membuat gambar karikatur dari Pollinations: %s", e)
+            logger.warning("Gagal membuat gambar dari DeepAI: %s", e)
         return None
 
     def dark_overlay(self, image):
@@ -80,7 +79,7 @@ class ThumbnailGenerator:
             image = None
             headline_text = article.headline or article.title or "Breaking News"
             
-            # Coba buat gambar karikatur via Pollinations AI
+            # Coba buat gambar via DeepAI
             image = self.generate_ai_image(headline_text, article.category)
             
             # Fallback jika AI gagal (latar belakang warna gelap elegan)
@@ -140,7 +139,7 @@ class ThumbnailGenerator:
             image.save(output, quality=95)
             
             article.thumbnail = str(output.resolve())
-            logger.info("Thumbnail karikatur berhasil disimpan: %s", article.thumbnail)
+            logger.info("Thumbnail karikatur DeepAI berhasil disimpan: %s", article.thumbnail)
             return article.thumbnail
             
         except Exception as e:
