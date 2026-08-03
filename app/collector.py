@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from email.utils import parsedate_to_datetime
-from datetime import datetime
-from typing import Optional
 import html
 import re
-import time
+from datetime import datetime
+from email.utils import parsedate_to_datetime
+from typing import Optional
 
 import feedparser
 import requests
@@ -15,16 +14,20 @@ from config import (
     RSS_FEEDS,
     GOOGLE_KEYWORDS,
     USER_AGENT,
-    REQUEST_TIMEOUT,
+    RSS_LIMIT,
+    GOOGLE_LIMIT,
     MAX_RETRY,
+    REQUEST_TIMEOUT,
 )
 
-from models import NewsArticle
 from logger import logger
+from models import NewsArticle
 
 
 HEADERS = {
+
     "User-Agent": USER_AGENT
+
 }
 
 
@@ -34,170 +37,40 @@ class NewsCollector:
 
         self.session = requests.Session()
 
-        self.session.headers.update(HEADERS)
+        self.session.headers.update(
 
-    # -----------------------------
-    # TEXT
-    # -----------------------------
+            HEADERS
 
-    def clean_html(self, text: str) -> str:
-
-        if not text:
-            return ""
-
-        text = html.unescape(text)
-
-        soup = BeautifulSoup(
-            text,
-            "html.parser"
         )
-
-        text = soup.get_text(
-            " ",
-            strip=True
-        )
-
-        text = re.sub(
-            r"\s+",
-            " ",
-            text
-        )
-
-        return text.strip()
-
-    # -----------------------------
-    # DATE
-    # -----------------------------
-
-    def parse_date(
-        self,
-        value: str
-    ) -> Optional[datetime]:
-
-        if not value:
-            return None
-
-        try:
-            return parsedate_to_datetime(
-                value
-            )
-
-        except Exception:
-
-            return None
-
-    # -----------------------------
-    # IMAGE
-    # -----------------------------
-
-    def extract_image(
-        self,
-        entry
-    ) -> Optional[str]:
-
-        if hasattr(entry, "media_content"):
-
-            media = entry.media_content
-
-            if media:
-
-                return media[0].get("url")
-
-        if hasattr(entry, "media_thumbnail"):
-
-            media = entry.media_thumbnail
-
-            if media:
-
-                return media[0].get("url")
-
-        summary = entry.get(
-            "summary",
-            ""
-        )
-
-        if summary:
-
-            soup = BeautifulSoup(
-                summary,
-                "html.parser"
-            )
-
-            img = soup.find("img")
-
-            if img:
-
-                return img.get("src")
-
-        return None
-
-    # -----------------------------
-    # URL
-    # -----------------------------
-
-    def canonical_url(
-        self,
-        url: str
-    ) -> str:
-
-        if not url:
-
-            return ""
-
-        url = url.split("?")[0]
-
-        url = url.rstrip("/")
-
-        return url
-
-    # -----------------------------
-    # HTTP
-    # -----------------------------
-
-    def fetch_feed(
-        self,
-        url: str
-    ):
-
-        for retry in range(MAX_RETRY):
-
-            try:
-
-                logger.info(
-                    "Fetch %s",
-                    url
-                )
-
-                return feedparser.parse(url)
-
-            except Exception as e:
-
-                logger.exception(e)
-
-                time.sleep(2)
-
-        return None
-
-    # -----------------------------
-    # GOOGLE NEWS
-    # -----------------------------
 
     def google_news_url(
+
         self,
-        keyword: str
+
+        keyword: str,
+
     ) -> str:
 
         keyword = keyword.replace(
+
             " ",
-            "+"
+
+            "+",
+
         )
 
         return (
+
             "https://news.google.com/rss/search?"
+
             f"q={keyword}"
+
             "&hl=en-US"
+
             "&gl=US"
+
             "&ceid=US:en"
+
         )
 
     def google_feeds(self):
@@ -213,50 +86,249 @@ class NewsCollector:
                 "category": "google",
 
                 "url": self.google_news_url(
+
                     keyword
-                )
+
+                ),
+
+                "limit": GOOGLE_LIMIT,
 
             })
 
         return feeds
 
-    # -----------------------------
-    # NORMALIZE
-    # -----------------------------
+    def clean_html(
+
+        self,
+
+        text: str,
+
+    ) -> str:
+
+        if not text:
+
+            return ""
+
+        text = html.unescape(
+
+            text
+
+        )
+
+        soup = BeautifulSoup(
+
+            text,
+
+            "html.parser",
+
+        )
+
+        text = soup.get_text(
+
+            " ",
+
+            strip=True,
+
+        )
+
+        text = re.sub(
+
+            r"\s+",
+
+            " ",
+
+            text,
+
+        )
+
+        return text.strip()
+
+    def parse_date(
+
+        self,
+
+        value: str,
+
+    ) -> Optional[datetime]:
+
+        if not value:
+
+            return None
+
+        try:
+
+            return parsedate_to_datetime(
+
+                value
+
+            )
+
+        except Exception:
+
+            return None
+
+    def extract_image(
+
+        self,
+
+        entry,
+
+    ) -> Optional[str]:
+
+        if hasattr(
+
+            entry,
+
+            "media_content",
+
+        ):
+
+            media = entry.media_content
+
+            if media:
+
+                return media[0].get(
+
+                    "url"
+
+                )
+
+        if hasattr(
+
+            entry,
+
+            "media_thumbnail",
+
+        ):
+
+            media = entry.media_thumbnail
+
+            if media:
+
+                return media[0].get(
+
+                    "url"
+
+                )
+
+        summary = entry.get(
+
+            "summary",
+
+            "",
+
+        )
+
+        if summary:
+
+            soup = BeautifulSoup(
+
+                summary,
+
+                "html.parser",
+
+            )
+
+            img = soup.find(
+
+                "img"
+
+            )
+
+            if img:
+
+                return img.get(
+
+                    "src"
+
+                )
+
+        return None
+
+    def fetch_feed(
+
+        self,
+
+        url: str,
+
+    ):
+
+        for _ in range(
+
+            MAX_RETRY
+
+        ):
+
+            try:
+
+                logger.info(
+
+                    "Fetch %s",
+
+                    url,
+
+                )
+
+                return feedparser.parse(
+
+                    url
+
+                )
+
+            except Exception as e:
+
+                logger.exception(
+
+                    e
+
+                )
+
+        return None
 
     def normalize(
+
         self,
+
         entry,
-        source: dict,
+
+        source,
+
     ) -> NewsArticle:
 
         return NewsArticle(
 
             title=entry.get(
+
                 "title",
-                ""
+
+                "",
+
             ).strip(),
 
             summary=self.clean_html(
 
                 entry.get(
+
                     "summary",
-                    ""
+
+                    "",
+
                 )
 
             ),
 
-            link=self.canonical_url(
+            link=entry.get(
 
-                entry.get(
-                    "link",
-                    ""
-                )
+                "link",
+
+                "",
 
             ),
 
             image=self.extract_image(
+
                 entry
+
             ),
 
             source=source["name"],
@@ -266,109 +338,26 @@ class NewsCollector:
             published=self.parse_date(
 
                 entry.get(
+
                     "published",
-                    ""
+
+                    "",
+
                 )
 
-            )
+            ),
 
         )
 
-    # -----------------------------
-    # VALIDATION
-    # -----------------------------
+    def collect_feed(
 
-    def is_valid(
         self,
-        article: NewsArticle,
-    ) -> bool:
 
-        if not article.title:
-            return False
-
-        if len(article.title) < 10:
-            return False
-
-        if not article.link:
-            return False
-
-        if article.title.lower().startswith(
-            "photo"
-        ):
-            return False
-
-        if article.title.lower().startswith(
-            "gallery"
-        ):
-            return False
-
-        return True
-
-    # -----------------------------
-    # DUPLICATE
-    # -----------------------------
-
-    def remove_duplicate_url(
-        self,
-        articles,
-    ):
-
-        result = []
-
-        urls = set()
-
-        for article in articles:
-
-            if article.link in urls:
-                continue
-
-            urls.add(
-                article.link
-            )
-
-            result.append(
-                article
-            )
-
-        return result
-
-    # -----------------------------
-    # SORT
-    # -----------------------------
-
-    def sort_articles(
-        self,
-        articles,
-    ):
-
-        return sorted(
-
-            articles,
-
-            key=lambda x:
-                x.published
-                or datetime.min,
-
-            reverse=True
-
-        )
-
-    # -----------------------------
-    # LOAD ONE FEED
-    # -----------------------------
-
-    def load_feed(
-        self,
         source,
+
     ):
 
-        logger.info(
-
-            "Feed : %s",
-
-            source["name"]
-
-        )
+        articles = []
 
         feed = self.fetch_feed(
 
@@ -378,28 +367,15 @@ class NewsCollector:
 
         if not feed:
 
-            return []
+            return articles
 
-        articles = []
+        limit = source.get(
 
-        for entry in feed.entries:
+            "limit",
 
-            article = self.normalize(
+            RSS_LIMIT,
 
-                entry,
-
-                source
-
-            )
-
-            if not self.is_valid(
-                article
-            ):
-                continue
-
-            articles.append(
-                article
-            )
+        )
 
         logger.info(
 
@@ -407,15 +383,35 @@ class NewsCollector:
 
             source["name"],
 
-            len(articles)
+            len(feed.entries),
 
         )
 
-        return articles
+        for entry in feed.entries[:limit]:
 
-    # -----------------------------
-    # MAIN COLLECTOR
-    # -----------------------------
+            try:
+
+                articles.append(
+
+                    self.normalize(
+
+                        entry,
+
+                        source,
+
+                    )
+
+                )
+
+            except Exception as e:
+
+                logger.exception(
+
+                    e
+
+                )
+
+        return articles
 
     def collect(self):
 
@@ -423,60 +419,72 @@ class NewsCollector:
 
         feeds = []
 
-        feeds.extend(RSS_FEEDS)
+        for feed in RSS_FEEDS:
 
-        feeds.extend(self.google_feeds())
+            feed = dict(feed)
 
-        logger.info(
-            "Total Feeds : %s",
-            len(feeds)
+            feed["limit"] = RSS_LIMIT
+
+            feeds.append(feed)
+
+        feeds.extend(
+
+            self.google_feeds()
+
         )
 
-        for source in feeds:
+        logger.info(
 
-            try:
+            "Total Feeds : %s",
 
-                items = self.load_feed(
-                    source
+            len(feeds),
+
+        )
+
+        for feed in feeds:
+
+            logger.info(
+
+                "Feed : %s",
+
+                feed["name"],
+
+            )
+
+            articles.extend(
+
+                self.collect_feed(
+
+                    feed
+
                 )
 
-                if items:
-
-                    articles.extend(
-                        items
-                    )
-
-            except Exception as e:
-
-                logger.exception(e)
-
-        before = len(articles)
-
-        articles = self.remove_duplicate_url(
-            articles
-        )
-
-        after = len(articles)
+            )
 
         logger.info(
-            "Duplicate Removed : %s",
-            before - after
-        )
 
-        articles = self.sort_articles(
-            articles
-        )
-
-        logger.info(
             "Collected : %s Articles",
-            len(articles)
+
+            len(articles),
+
+        )
+
+        articles.sort(
+
+            key=lambda x: (
+
+                x.published
+
+                or datetime.min
+
+            ),
+
+            reverse=True,
+
         )
 
         return articles
 
-# -----------------------------
-# DEBUG
-# -----------------------------
 
 if __name__ == "__main__":
 
@@ -486,18 +494,22 @@ if __name__ == "__main__":
 
     print()
 
-    print("=" * 60)
+    print(
 
-    print("TOTAL :", len(articles))
+        "TOTAL:",
 
-    print("=" * 60)
+        len(articles)
+
+    )
+
+    print()
 
     for article in articles[:10]:
 
-        print()
+        print(
 
-        print(article.title)
+            article.published,
 
-        print(article.source)
+            article.title,
 
-        print(article.link)
+        )
