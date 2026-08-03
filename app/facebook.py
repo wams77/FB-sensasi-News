@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import time
+
 import requests
 
 from config import (
-    FACEBOOK_PAGE_ID,
     FACEBOOK_ACCESS_TOKEN,
+    FACEBOOK_PAGE_ID,
     MAX_RETRY,
     REQUEST_TIMEOUT,
 )
@@ -21,17 +22,12 @@ class FacebookPublisher:
 
     def __init__(self):
 
-        self.feed_url = (
-            f"{GRAPH_URL}/{FACEBOOK_PAGE_ID}/feed"
-        )
-
         self.photo_url = (
             f"{GRAPH_URL}/{FACEBOOK_PAGE_ID}/photos"
         )
 
-    def _request(
+    def request(
         self,
-        url: str,
         payload: dict,
     ):
 
@@ -43,7 +39,7 @@ class FacebookPublisher:
 
                 response = requests.post(
 
-                    url,
+                    self.photo_url,
 
                     data=payload,
 
@@ -51,11 +47,15 @@ class FacebookPublisher:
 
                 )
 
+                logger.info(
+
+                    response.text
+
+                )
+
                 if response.ok:
 
                     return response.json()
-
-                logger.error(response.text)
 
             except Exception as e:
 
@@ -64,50 +64,6 @@ class FacebookPublisher:
             time.sleep(2)
 
         return None
-
-    def publish_text(
-        self,
-        message: str,
-        link: str,
-    ):
-
-        payload = {
-
-            "message": message,
-
-            "link": link,
-
-        }
-
-        return self._request(
-
-            self.feed_url,
-
-            payload,
-
-        )
-
-    def publish_photo(
-        self,
-        image: str,
-        caption: str,
-    ):
-
-        payload = {
-
-            "url": image,
-
-            "caption": caption,
-
-        }
-
-        return self._request(
-
-            self.photo_url,
-
-            payload,
-
-        )
 
     def build_caption(
         self,
@@ -118,45 +74,53 @@ class FacebookPublisher:
             article.hashtags
         )
 
-        text = f"""{article.headline}
+        caption = f"""{article.emoji} {article.headline}
 
-{article.caption}
+{article.article}
 
 {hashtags}
+
+━━━━━━━━━━━━━━
+📢 Ikuti Gosip.ID untuk berita olahraga & hiburan terbaru.
 """
 
-        return text.strip()
+        return caption.strip()
 
     def publish(
         self,
         article: NewsArticle,
-    ) -> str | None:
+    ):
 
-        caption = self.build_caption(
+                caption = self.build_caption(
             article
         )
 
-        if article.image:
+        payload = {
 
-            result = self.publish_photo(
+            # Upload foto dari URL RSS
+            "url": article.image,
 
-                article.image,
+            # Artikel hasil AI
+            "caption": caption,
 
-                caption,
+            # Pastikan muncul di timeline
+            "published": "true",
 
-            )
+        }
 
-        else:
-
-            result = self.publish_text(
-
-                caption,
-
-                article.link,
-
-            )
+        result = self.request(
+            payload
+        )
 
         if not result:
+
+            logger.error(
+
+                "Facebook Failed : %s",
+
+                article.title,
+
+            )
 
             return None
 
@@ -181,3 +145,46 @@ class FacebookPublisher:
         )
 
         return post_id
+
+
+if __name__ == "__main__":
+
+    article = NewsArticle(
+
+        title="Dummy",
+
+        summary="",
+
+        link="",
+
+        image="https://picsum.photos/1200/630",
+
+        source="Test",
+
+        category="football",
+
+        published=None,
+
+    )
+
+    article.headline = "Judul Berita"
+
+    article.article = (
+        "Ini adalah artikel hasil AI. "
+        "Artikel ini hanya digunakan "
+        "untuk pengujian upload ke Facebook."
+    )
+
+    article.hashtags = [
+
+        "#Football",
+
+        "#Breaking",
+
+    ]
+
+    article.emoji = "🔥"
+
+    FacebookPublisher().publish(
+        article
+    )
