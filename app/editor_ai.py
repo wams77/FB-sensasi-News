@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from groq import Groq
 
@@ -31,6 +32,7 @@ ATURAN:
 - Tutup dengan pertanyaan agar pembaca berdiskusi.
 - Jangan menyebut nama AI.
 - Maksimal 5 hashtag.
+- JANGAN gunakan tanda kutip ganda (") di dalam nilai teks JSON untuk menghindari error parsing. Gunakan kutip tunggal (') jika diperlukan.
 
 Balas HARUS JSON VALID.
 
@@ -57,20 +59,6 @@ priority:
 3 = Normal
 
 4 = Skip
-
-category:
-
-football
-
-transfer
-
-kpop
-
-drama
-
-entertainment
-
-other
 """
 
 
@@ -85,22 +73,17 @@ class AIEditor:
         self,
         article: NewsArticle,
     ) -> str:
+        # Batasi panjang ringkasan untuk menghemat token API
+        summary = article.summary[:800] if article.summary else ""
         return f"""
 TITLE
-
 {article.title}
 
 SUMMARY
-
-{article.summary}
+{summary}
 
 SOURCE
-
 {article.source}
-
-LINK
-
-{article.link}
 
 Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
 """
@@ -111,7 +94,7 @@ Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
     ) -> dict:
         response = self.client.chat.completions.create(
             model=MODEL,
-            temperature=0.5,
+            temperature=0.3,
             response_format={
                 "type": "json_object"
             },
@@ -130,7 +113,12 @@ Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
         )
 
         content = response.choices[0].message.content
-        return json.loads(content)
+        
+        # Bersihkan potensi markdown json block jika ada
+        content = re.sub(r"^```json\s*", "", content, flags=re.IGNORECASE)
+        content = re.sub(r"\s*```$", "", content)
+        
+        return json.loads(content.strip())
 
     def process(
         self,
@@ -174,7 +162,7 @@ Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
             )
             return article
         except Exception as e:
-            logger.exception(e)
+            logger.exception("AI Editor Error: %s", e)
             article.score = 0
             article.priority = 4
             article.headline = article.title
@@ -182,26 +170,3 @@ Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
             article.hashtags = []
             article.emoji = ""
             return article
-
-
-if __name__ == "__main__":
-    sample = NewsArticle(
-        title="Arsenal resmi mendapatkan pemain baru.",
-        summary="Arsenal dikabarkan menyelesaikan proses transfer setelah negosiasi selama beberapa pekan.",
-        link="https://example.com",
-        image=None,
-        source="BBC Football",
-        category="football",
-        published=None,
-    )
-    editor = AIEditor()
-    result = editor.process(sample)
-    print()
-    print("=" * 60)
-    print(result.headline)
-    print()
-    print(result.article)
-    print()
-    print(result.hashtags)
-    print()
-    print(result.score)
