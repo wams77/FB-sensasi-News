@@ -26,7 +26,9 @@ class ThumbnailGenerator:
 
     def __init__(self):
         self.output = CACHE_DIR / "thumbs"
+        # Pastikan direktori benar-benar dibuat
         self.output.mkdir(
+            parents=True,
             exist_ok=True
         )
         try:
@@ -49,7 +51,6 @@ class ThumbnailGenerator:
 
     def generate_ai_image(self, headline: str, category: str) -> Image.Image | None:
         try:
-            # Bersihkan teks agar aman dari karakter khusus
             clean_headline = headline.encode("ascii", "ignore").decode("ascii")
             if not clean_headline.strip():
                 clean_headline = "breaking news update"
@@ -62,8 +63,6 @@ class ThumbnailGenerator:
             r = requests.get(ai_url, timeout=30)
             if r.status_code == 200:
                 return Image.open(BytesIO(r.content)).convert("RGB")
-            else:
-                logger.warning("Pollinations AI merespon dengan status code: %s", r.status_code)
         except Exception as e:
             logger.warning("Gagal membuat gambar AI dari Pollinations: %s", e)
         return None
@@ -79,7 +78,7 @@ class ThumbnailGenerator:
             image = None
             headline_text = article.headline or article.title or "Breaking News"
             
-            # Buat gambar via Pollinations AI
+            # Coba buat gambar via Pollinations AI
             image = self.generate_ai_image(headline_text, article.category)
             
             # Fallback jika AI gagal (latar belakang warna gelap elegan)
@@ -135,12 +134,14 @@ class ThumbnailGenerator:
                 .replace("|", "_")
                 + ".jpg"
             )
+            
             output = self.output / filename
             image.save(output, quality=95)
             
-            article.thumbnail = str(output)
-            logger.info("Thumbnail berhasil disimpan: %s", output)
-            return str(output)
+            # Pastikan path disimpan sebagai string yang valid
+            article.thumbnail = str(output.resolve())
+            logger.info("Thumbnail berhasil disimpan: %s", article.thumbnail)
+            return article.thumbnail
             
         except Exception as e:
             logger.exception("Gagal total membuat thumbnail: %s", e)
