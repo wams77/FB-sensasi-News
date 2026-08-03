@@ -2,33 +2,35 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 
-@dataclass(slots=True)
+@dataclass
 class NewsArticle:
 
-    # Original Data
+    # Source
 
     title: str
+
     summary: str
+
     link: str
+
+    image: Optional[str]
 
     source: str
 
     category: str
 
-    published: Optional[datetime] = None
+    published: Optional[datetime]
 
-    image: Optional[str] = None
-
-    # AI Result
+    # AI
 
     headline: str = ""
 
-    caption: str = ""
+    article: str = ""
 
-    hashtags: List[str] = field(default_factory=list)
+    hashtags: list[str] = field(default_factory=list)
 
     emoji: str = ""
 
@@ -36,57 +38,157 @@ class NewsArticle:
 
     priority: int = 3
 
-    language: str = "en"
-
-    # Metadata
-
-    collected_at: datetime = field(
-        default_factory=datetime.utcnow
-    )
+    # Facebook
 
     posted: bool = False
 
-    facebook_post_id: Optional[str] = None
+    facebook_post_id: str = ""
 
-    def short_dict(self):
+    # Internal
+
+    thumbnail: str = ""
+
+    language: str = ""
+
+    duplicate_score: int = 0
+
+    created_at: datetime = field(
+        default_factory=datetime.utcnow
+    )
+
+    def to_dict(self):
 
         return {
 
             "title": self.title,
 
-            "headline": self.headline,
+            "summary": self.summary,
 
-            "score": self.score,
+            "link": self.link,
 
-            "priority": self.priority,
+            "image": self.image,
 
             "source": self.source,
 
             "category": self.category,
 
-            "link": self.link,
+            "published": (
+                self.published.isoformat()
+                if self.published
+                else None
+            ),
+
+            "headline": self.headline,
+
+            "article": self.article,
+
+            "hashtags": self.hashtags,
+
+            "emoji": self.emoji,
+
+            "score": self.score,
+
+            "priority": self.priority,
+
+            "posted": self.posted,
+
+            "facebook_post_id": self.facebook_post_id,
+
+            "thumbnail": self.thumbnail,
+
+            "language": self.language,
+
+            "duplicate_score": self.duplicate_score,
+
+            "created_at": self.created_at.isoformat(),
 
         }
 
-    def to_post(self):
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict,
+    ):
 
-        hashtags = " ".join(self.hashtags)
+        published = None
 
-        text = f"""{self.headline}
+        if data.get("published"):
 
-{self.caption}
+            published = datetime.fromisoformat(
+                data["published"]
+            )
 
-{hashtags}
-"""
+        obj = cls(
 
-        return text.strip()
+            title=data["title"],
 
-    @property
-    def is_breaking(self):
+            summary=data["summary"],
 
-        return self.priority == 1
+            link=data["link"],
 
-    @property
-    def is_viral(self):
+            image=data.get("image"),
 
-        return self.score >= 90
+            source=data["source"],
+
+            category=data["category"],
+
+            published=published,
+
+        )
+
+        obj.headline = data.get(
+            "headline",
+            ""
+        )
+
+        obj.article = data.get(
+            "article",
+            ""
+        )
+
+        obj.hashtags = data.get(
+            "hashtags",
+            []
+        )
+
+        obj.emoji = data.get(
+            "emoji",
+            ""
+        )
+
+        obj.score = data.get(
+            "score",
+            0
+        )
+
+        obj.priority = data.get(
+            "priority",
+            3
+        )
+
+        obj.posted = data.get(
+            "posted",
+            False
+        )
+
+        obj.facebook_post_id = data.get(
+            "facebook_post_id",
+            ""
+        )
+
+        obj.thumbnail = data.get(
+            "thumbnail",
+            ""
+        )
+
+        obj.language = data.get(
+            "language",
+            ""
+        )
+
+        obj.duplicate_score = data.get(
+            "duplicate_score",
+            0
+        )
+
+        return obj
