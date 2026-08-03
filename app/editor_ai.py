@@ -73,7 +73,6 @@ class AIEditor:
         self,
         article: NewsArticle,
     ) -> str:
-        # Batasi panjang ringkasan untuk menghemat token API
         summary = article.summary[:800] if article.summary else ""
         return f"""
 TITLE
@@ -113,8 +112,6 @@ Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
         )
 
         content = response.choices[0].message.content
-        
-        # Bersihkan potensi markdown json block jika ada
         content = re.sub(r"^```json\s*", "", content, flags=re.IGNORECASE)
         content = re.sub(r"\s*```$", "", content)
         
