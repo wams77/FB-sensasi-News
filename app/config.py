@@ -41,6 +41,11 @@ FACEBOOK_ACCESS_TOKEN = os.getenv(
     "",
 )
 
+DEEPAI_API_KEY = os.getenv(
+    "DEEPAI_API_KEY",
+    "",
+)
+
 
 # ============================================
 # BOT
