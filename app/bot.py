@@ -61,10 +61,11 @@ class NewsBot:
 
         return articles
 
-    def should_skip(
+    def process_article(
         self,
         article,
     ) -> bool:
+        # 1. Cek riwayat terlebih dahulu untuk menghindari pemanggilan AI berulang pada berita yang sama
         if self.history.exists(
             article.link
         ):
@@ -72,39 +73,31 @@ class NewsBot:
                 "History Skip : %s",
                 article.title,
             )
-            return True
+            return False
 
+        # 2. Proses analisis menggunakan AI Editor
+        article = self.editor.process(
+            article
+        )
+
+        # 3. Cek prioritas (jika 4, berarti dilewati)
         if article.priority == 4:
             logger.info(
                 "Priority Skip : %s",
                 article.title,
             )
-            return True
+            return False
 
+        # 4. Cek skor viral minimum
         if article.score < MIN_VIRAL_SCORE:
             logger.info(
                 "Score Skip : %s (%s)",
                 article.title,
                 article.score,
             )
-            return True
-
-        return False
-
-    def process_article(
-        self,
-        article,
-    ) -> bool:
-        # Cek history terlebih dahulu sebelum memanggil API AI agar tidak boros token
-        if self.should_skip(
-            article
-        ):
             return False
 
-        article = self.editor.process(
-            article
-        )
-
+        # 5. Publikasikan ke halaman Facebook
         post_id = self.facebook.publish(
             article
         )
@@ -116,6 +109,7 @@ class NewsBot:
             )
             return False
 
+        # 6. Simpan ke history jika berhasil diposting
         self.history.add(
             article.link
         )
