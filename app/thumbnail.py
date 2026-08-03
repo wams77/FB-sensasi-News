@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import fill
+from urllib.parse import quote
 
 import requests
 
@@ -41,7 +42,6 @@ class ThumbnailGenerator:
                 26
             )
         except Exception:
-            # Fallback font bawaan jika file font tidak ditemukan
             self.title_font = ImageFont.load_default()
             self.brand_font = ImageFont.load_default()
             self.label_font = ImageFont.load_default()
@@ -63,6 +63,29 @@ class ThumbnailGenerator:
         ).convert(
             "RGB"
         )
+
+    def generate_ai_image(self, headline: str, category: str) -> Image.Image | None:
+        """
+        Menghasilkan gambar AI menggunakan Pollinations AI berdasarkan headline berita.
+        """
+        try:
+            # Buat prompt bahasa Inggris yang deskriptif agar hasil gambar AI lebih optimal
+            clean_headline = headline.encode("ascii", "ignore").decode("ascii")
+            prompt = f"Professional cinematic news background about {clean_headline}, category {category}, high quality, 4k"
+            encoded_prompt = quote(prompt)
+            
+            # URL API Pollinations AI (Flux / default model)
+            ai_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={WIDTH}&height={HEIGHT}&nologo=true"
+            
+            logger.info("Membuat gambar AI via Pollinations AI untuk: %s", headline)
+            r = requests.get(ai_url, timeout=45)
+            if r.status_code == 200:
+                from io import BytesIO
+                return Image.open(BytesIO(r.content)).convert("RGB")
+        except Exception as e:
+            logger.warning("Gagal membuat gambar AI dari Pollinations: %s", e)
+        
+        return None
 
     def dark_overlay(
         self,
@@ -123,17 +146,27 @@ class ThumbnailGenerator:
     ) -> str:
         try:
             image = None
+            
+            # 1. Coba unduh gambar asli dari artikel terlebih dahulu
             if article.image:
                 try:
                     image = self.download_image(article.image)
                     image = self.fit_image(image)
                     image = self.dark_overlay(image)
                 except Exception as img_err:
-                    logger.warning("Gagal unduh gambar asli (%s), menggunakan background default.", img_err)
+                    logger.warning("Gagal unduh gambar asli (%s). Mencoba buat via AI...", img_err)
 
-            # Fallback jika gambar gagal diunduh atau tidak ada
+            # 2. Jika gambar asli tidak ada/gagal, generate menggunakan Pollinations AI
             if image is None:
-                image = Image.new("RGB", (WIDTH, HEIGHT), color=(20, 24, 33))
+                headline_text = article.headline or article.title or "Breaking News"
+                image = self.generate_ai_image(headline_text, article.category)
+                if image:
+                    image = self.dark_overlay(image)
+
+            # 3. Fallback terakhir jika AI juga gagal (warna solid gelap)
+            if image is None:
+                image = Image.new("RGB", (WIDTH, HEIGHT), color=(15, 23, 42))
+                image = self.dark_overlay(image)
 
             draw = ImageDraw.Draw(
                 image
@@ -222,7 +255,7 @@ if __name__ == "__main__":
         title="Dummy",
         summary="",
         link="",
-        image="https://picsum.photos/1200/630",
+        image=None,  # Sengaja dikosongkan untuk menguji Pollinations AI
         source="Test",
         category="football",
         published=None,
