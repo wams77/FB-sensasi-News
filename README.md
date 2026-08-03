@@ -1,36 +1,60 @@
-# Sensasi News Bot
+# FB Sensasi News
 
-AI News Bot menggunakan:
+AI Facebook News Bot menggunakan:
 
-- Groq
-- GitHub Actions
+- Groq AI
 - Facebook Graph API
+- GitHub Actions
 
 ## Feature
 
+- Multi RSS
+- Google News RSS
 - Football News
-- K-Entertainment
-- AI Viral Score
+- Korean Entertainment
 - AI Rewrite
+- AI Viral Score
 - Auto Hashtag
-- Auto Facebook Post
-- Duplicate Detection
-- Posting History
+- Auto Facebook Posting
+- Duplicate History
+- Logging
+
+## Install
+
+```bash
+pip install -r requirements.txt
+```
+
+Copy
+
+```
+.env.example
+```
+
+menjadi
+
+```
+.env
+```
+
+isi API.
+
+Jalankan
+
+```bash
+python app/bot.py
+```
 
 ## GitHub Secrets
 
+Tambahkan pada repository
+
+```
 GROQ_API_KEY
 
 FACEBOOK_PAGE_ID
 
 FACEBOOK_ACCESS_TOKEN
-
-## Run Local
-
-```bash
-pip install -r requirements.txt
-
-python app/bot.py
 ```
 
-GitHub Actions akan menjalankan bot setiap 30 menit.
+GitHub Actions akan berjalan setiap 30 menit.
