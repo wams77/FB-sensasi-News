@@ -95,14 +95,15 @@ class NewsBot:
         self,
         article,
     ) -> bool:
-        article = self.editor.process(
-            article
-        )
-
+        # Cek history terlebih dahulu sebelum memanggil API AI agar tidak boros token
         if self.should_skip(
             article
         ):
             return False
+
+        article = self.editor.process(
+            article
+        )
 
         post_id = self.facebook.publish(
             article
