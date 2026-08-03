@@ -1,58 +1,188 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 
-FILE = Path("data/history.json")
+from config import DATA_DIR
+from logger import logger
 
 
 class History:
 
     def __init__(self):
 
-        FILE.parent.mkdir(exist_ok=True)
+        self.file = DATA_DIR / "history.json"
 
-        if not FILE.exists():
-            FILE.write_text("[]", encoding="utf-8")
+        self.items = set()
+
+        self.load()
 
     def load(self):
 
-        return json.loads(
+        if not self.file.exists():
 
-            FILE.read_text(
+            self.save()
 
-                encoding="utf-8"
+            return
+
+        try:
+
+            with open(
+
+                self.file,
+
+                "r",
+
+                encoding="utf-8",
+
+            ) as f:
+
+                data = json.load(f)
+
+            self.items = set(data)
+
+            logger.info(
+
+                "History Loaded : %s",
+
+                len(self.items),
 
             )
 
+        except Exception as e:
+
+            logger.exception(e)
+
+            self.items = set()
+
+    def save(self):
+
+        with open(
+
+            self.file,
+
+            "w",
+
+            encoding="utf-8",
+
+        ) as f:
+
+            json.dump(
+
+                sorted(self.items),
+
+                f,
+
+                indent=4,
+
+                ensure_ascii=False,
+
+            )
+    def exists(
+
+        self,
+
+        url: str,
+
+    ) -> bool:
+
+        return url in self.items
+
+    def add(
+
+        self,
+
+        url: str,
+
+    ):
+
+        if not url:
+
+            return
+
+        self.items.add(
+
+            url
+
         )
 
-    def save(self, data):
+        self.save()
 
-        FILE.write_text(
+        logger.info(
 
-            json.dumps(
+            "History Added : %s",
 
-                data,
-
-                indent=2,
-
-                ensure_ascii=False
-
-            ),
-
-            encoding="utf-8"
+            url,
 
         )
 
-    def exists(self, url):
+    def remove(
 
-        return url in self.load()
+        self,
 
-    def add(self, url):
+        url: str,
 
-        history = self.load()
+    ):
 
-        history.append(url)
+        if url in self.items:
 
-        history = history[-1000:]
+            self.items.remove(
 
-        self.save(history)
+                url
+
+            )
+
+            self.save()
+
+    def clear(
+
+        self,
+
+    ):
+
+        self.items = set()
+
+        self.save()
+
+        logger.info(
+
+            "History Cleared"
+
+        )
+
+
+if __name__ == "__main__":
+
+    history = History()
+
+    history.add(
+
+        "https://example.com/article"
+
+    )
+
+    print(
+
+        history.exists(
+
+            "https://example.com/article"
+
+        )
+
+    )
+
+    history.remove(
+
+        "https://example.com/article"
+
+    )
+
+    print(
+
+        history.exists(
+
+            "https://example.com/article"
+
+        )
+
+    )
