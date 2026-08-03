@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import feedparser
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timezone
 import time
+from email.utils import parsedate_to_datetime
 
 from config import RSS_FEEDS, RSS_LIMIT
 from logger import logger
@@ -54,6 +55,28 @@ class NewsCollector:
 
         return None
 
+    def parse_published_date(self, entry) -> datetime:
+        """Mengonversi tanggal publikasi RSS menjadi objek datetime."""
+        for field in ["published_parsed", "updated_parsed", "created_parsed"]:
+            time_tuple = entry.get(field)
+            if time_tuple:
+                try:
+                    return datetime.fromtimestamp(time.mktime(time_tuple), tz=timezone.utc)
+                except Exception:
+                    pass
+
+        for field in ["published", "updated", "date"]:
+            date_str = entry.get(field)
+            if date_str:
+                try:
+                    dt = parsedate_to_datetime(date_str)
+                    if dt:
+                        return dt
+                except Exception:
+                    pass
+
+        return datetime.now(timezone.utc)
+
     def fetch_feed(self, feed_info: dict) -> list[NewsArticle]:
         articles = []
         name = feed_info["name"]
@@ -83,12 +106,9 @@ class NewsCollector:
                     soup = BeautifulSoup(summary, "html.parser")
                     summary = soup.get_text().strip()
 
-                # Ambil waktu publikasi atau gunakan waktu saat ini jika tidak ada
-                published = entry.get("published", "") or entry.get("updated", "") or datetime.now().isoformat()
-
+                published = self.parse_published_date(entry)
                 image_url = self.extract_image(entry)
 
-                # Menyertakan parameter 'published' yang wajib ada pada model
                 article = NewsArticle(
                     title=title,
                     link=link,
