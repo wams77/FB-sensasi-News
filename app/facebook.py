@@ -1,181 +1,140 @@
-"""
-facebook.py
+from __future__ import annotations
 
-Facebook Graph API Publisher
-"""
-
-import logging
 import time
-from typing import Optional
-
 import requests
 
 from config import (
-    FACEBOOK_ACCESS_TOKEN,
     FACEBOOK_PAGE_ID,
+    FACEBOOK_ACCESS_TOKEN,
+    MAX_RETRY,
+    REQUEST_TIMEOUT,
 )
 
-logger = logging.getLogger(__name__)
+from logger import logger
+from models import NewsArticle
 
-GRAPH = "https://graph.facebook.com/v23.0"
 
-TIMEOUT = 60
+GRAPH_URL = "https://graph.facebook.com/v23.0"
 
-MAX_RETRY = 3
 
 class FacebookPublisher:
 
     def __init__(self):
 
         self.feed_url = (
-            f"{GRAPH}/{FACEBOOK_PAGE_ID}/feed"
+            f"{GRAPH_URL}/{FACEBOOK_PAGE_ID}/feed"
         )
 
         self.photo_url = (
-            f"{GRAPH}/{FACEBOOK_PAGE_ID}/photos"
+            f"{GRAPH_URL}/{FACEBOOK_PAGE_ID}/photos"
         )
 
-        self.comment_url = GRAPH
-
-    def request(
+    def _request(
         self,
-        url,
-        payload,
+        url: str,
+        payload: dict,
     ):
 
         payload["access_token"] = FACEBOOK_ACCESS_TOKEN
 
-        for retry in range(MAX_RETRY):
+        for _ in range(MAX_RETRY):
 
             try:
 
-                r = requests.post(
+                response = requests.post(
 
                     url,
 
                     data=payload,
 
-                    timeout=TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
 
                 )
 
-                if r.status_code == 200:
+                if response.ok:
 
-                    return r.json()
+                    return response.json()
 
-                logger.warning(r.text)
+                logger.error(response.text)
 
             except Exception as e:
 
-                logger.warning(e)
+                logger.exception(e)
 
             time.sleep(2)
 
         return None
 
     def publish_text(
-
         self,
-
-        message,
-
-        link,
-
+        message: str,
+        link: str,
     ):
 
         payload = {
 
             "message": message,
 
-            "link": link
+            "link": link,
 
         }
 
-        return self.request(
+        return self._request(
 
             self.feed_url,
 
-            payload
+            payload,
 
         )
 
     def publish_photo(
-
         self,
-
-        image,
-
-        caption,
-
+        image: str,
+        caption: str,
     ):
 
         payload = {
 
             "url": image,
 
-            "caption": caption
+            "caption": caption,
 
         }
 
-        return self.request(
+        return self._request(
 
             self.photo_url,
 
-            payload
+            payload,
 
         )
 
-    def comment(
-
+    def build_caption(
         self,
+        article: NewsArticle,
+    ) -> str:
 
-        post_id,
-
-        message,
-
-    ):
-
-        payload = {
-
-            "message": message
-
-        }
-
-        return self.request(
-
-            f"{GRAPH}/{post_id}/comments",
-
-            payload
-
+        hashtags = " ".join(
+            article.hashtags
         )
 
-    def publish(
-
-        self,
-
-        article,
-
-    ):
-
-        hashtags = ""
-
-        if article.hashtags:
-
-            hashtags = " ".join(
-
-                article.hashtags
-
-            )
-
-        caption = f"""
-
-{article.headline}
+        text = f"""{article.headline}
 
 {article.caption}
 
 {hashtags}
-
 """
+
+        return text.strip()
+
+    def publish(
+        self,
+        article: NewsArticle,
+    ) -> str | None:
+
+        caption = self.build_caption(
+            article
+        )
 
         if article.image:
 
@@ -183,7 +142,7 @@ class FacebookPublisher:
 
                 article.image,
 
-                caption
+                caption,
 
             )
 
@@ -193,37 +152,32 @@ class FacebookPublisher:
 
                 caption,
 
-                article.link
+                article.link,
 
             )
 
         if not result:
 
-            return False
+            return None
 
-        post_id = result.get("post_id")
+        post_id = (
 
-        if not post_id:
+            result.get("post_id")
 
-            post_id = result.get("id")
-
-        if post_id:
-
-            self.comment(
-
-                post_id,
-
-                f"📰 Sumber:\n{article.link}"
-
-            )
-
-        logger.info(
-
-            "Posted %s",
-
-            article.title
+            or result.get("id")
 
         )
 
-        return True
+        article.facebook_post_id = post_id
 
+        article.posted = True
+
+        logger.info(
+
+            "Facebook Success : %s",
+
+            article.title,
+
+        )
+
+        return post_id
