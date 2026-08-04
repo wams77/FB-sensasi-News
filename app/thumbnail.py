@@ -12,6 +12,7 @@ from config import CACHE_DIR
 from logger import logger
 from models import NewsArticle
 
+# STANDAR UKURAN FACEBOOK LINK PREVIEW
 WIDTH = 1200
 HEIGHT = 630
 
@@ -22,7 +23,7 @@ class ThumbnailGenerator:
         self.output = CACHE_DIR / "thumbs"
         self.output.mkdir(parents=True, exist_ok=True)
         
-        # --- AUTO DOWNLOAD FONT JIKA TIDAK ADA ---
+        # --- AUTO DOWNLOAD FONT ---
         font_path = Path("assets/fonts/Poppins-Bold.ttf")
         if not font_path.exists():
             logger.info("Font tidak ditemukan. Mengunduh Poppins-Bold.ttf otomatis...")
@@ -30,16 +31,15 @@ class ThumbnailGenerator:
             font_url = "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf"
             try:
                 urllib.request.urlretrieve(font_url, font_path)
-                logger.info("Font berhasil diunduh!")
             except Exception as e:
                 logger.error("Gagal mengunduh font: %s", e)
 
         try:
-            self.title_font = ImageFont.truetype(str(font_path), 58)
-            self.brand_font = ImageFont.truetype(str(font_path), 30)
-            self.label_font = ImageFont.truetype(str(font_path), 26)
-        except Exception as e:
-            logger.error("FONT TIDAK DITEMUKAN! Menggunakan font default kecil. Error: %s", e)
+            # Ukuran font disesuaikan agar pas di layar HP (Mobile Feed FB)
+            self.title_font = ImageFont.truetype(str(font_path), 54)
+            self.brand_font = ImageFont.truetype(str(font_path), 28)
+            self.label_font = ImageFont.truetype(str(font_path), 24)
+        except Exception:
             self.title_font = ImageFont.load_default()
             self.brand_font = ImageFont.load_default()
             self.label_font = ImageFont.load_default()
@@ -52,13 +52,7 @@ class ThumbnailGenerator:
             response = requests.get(image_url, timeout=15)
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content)).convert("RGB")
-                
-                # Jika resolusi asli gambar terlalu kecil, buang agar tidak buram/pecah saat diperbesar
-                if img.width < 400 or img.height < 300:
-                    logger.warning("Gambar bawaan terlalu kecil (%dx%d). Menggunakan background solid.", img.width, img.height)
-                    return None
-
-                # Gunakan ImageOps.fit untuk memotong (crop) proporsional, BUKAN resize yang bikin gepeng
+                # Tetap ambil semua ukuran gambar, crop ke 1200x630 tanpa merusak proporsi
                 img = ImageOps.fit(img, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
                 return img
         except Exception as e:
@@ -66,7 +60,8 @@ class ThumbnailGenerator:
         return None
 
     def dark_overlay(self, image):
-        overlay = Image.new("RGBA", image.size, (0, 0, 0, 140))
+        # Menggelapkan gambar dengan opasitas 150 agar teks sangat kontras dan mudah dibaca di FB
+        overlay = Image.new("RGBA", image.size, (15, 23, 42, 160))
         image = image.convert("RGBA")
         image.alpha_composite(overlay)
         return image.convert("RGB")
@@ -75,67 +70,68 @@ class ThumbnailGenerator:
         try:
             headline_text = article.headline or article.title or "Breaking News"
             
-            # Coba ambil gambar asli dari artikel
             image = self.download_image(article.image)
             
-            # Fallback jika berita tidak punya gambar atau gambarnya buram
             if image is None:
-                logger.info("Gambar berita tidak valid, menggunakan background solid.")
+                # Fallback jika tidak ada gambar sama sekali
+                logger.info("Gambar berita tidak ada, menggunakan background solid.")
                 image = Image.new("RGB", (WIDTH, HEIGHT), color=(15, 23, 42))
 
             image = self.dark_overlay(image)
             draw = ImageDraw.Draw(image)
 
-            # BREAKING LABEL
+            # ZONA AMAN FACEBOOK (SAFE ZONE)
+            # Menghindari bagian ujung yang sering ter-crop di HP
+            margin_left = 80
+            margin_top = 80
+
+            # 1. KOTAK BREAKING LABEL
+            label_text = "BREAKING NEWS"
+            # Menghitung panjang kotak otomatis berdasarkan teks
+            bbox = draw.textbbox((0, 0), label_text, font=self.label_font)
+            label_width = bbox[2] - bbox[0] + 40  # Padding kiri-kanan 20px
+            label_height = 50
+            
             draw.rounded_rectangle(
-                (40, 40, 260, 90),
-                radius=12,
-                fill=(220, 0, 0),
+                (margin_left, margin_top, margin_left + label_width, margin_top + label_height),
+                radius=10,
+                fill=(220, 38, 38), # Warna Merah Terang Modern
             )
             draw.text(
-                (60, 50),
-                "BREAKING",
+                (margin_left + 20, margin_top + 8),
+                label_text,
                 font=self.label_font,
                 fill="white",
             )
 
-            # TITLE
-            title = fill(headline_text, width=26)
+            # 2. JUDUL BERITA (TITLE)
+            # Lebar teks dibatasi agar tidak menyentuh ujung kanan gambar
+            title = fill(headline_text, width=32)
             draw.multiline_text(
-                (60, 140),
+                (margin_left, margin_top + 90),
                 title,
                 font=self.title_font,
                 fill="white",
-                spacing=12,
+                spacing=16, # Jarak antar baris teks diperlebar agar rapi
             )
 
-            # BRAND
+            # 3. BRAND GOSIP.ID (Di sudut bawah)
             draw.text(
-                (60, HEIGHT - 70),
+                (margin_left, HEIGHT - 90),
                 "Gosip.ID",
                 font=self.brand_font,
-                fill="white",
+                fill=(203, 213, 225), # Warna teks abu-abu terang elegan
             )
 
+            # FORMATTING NAMA FILE
             safe_title = article.title if article.title else "news_article"
-            filename = (
-                safe_title[:40]
-                .replace("/", "_")
-                .replace("\\", "_")
-                .replace(":", "_")
-                .replace("*", "_")
-                .replace("?", "_")
-                .replace("\"", "_")
-                .replace("<", "_")
-                .replace(">", "_")
-                .replace("|", "_")
-                + ".jpg"
-            )
+            filename = "".join(c if c.isalnum() or c in " _-" else "_" for c in safe_title)[:40].strip() + ".jpg"
             output = self.output / filename
+            
+            # Simpan dengan kualitas HD (95%)
             image.save(output, quality=95)
             
             article.thumbnail = str(output.resolve())
-            logger.info("Thumbnail dari gambar asli berhasil disimpan: %s", article.thumbnail)
             return article.thumbnail
             
         except Exception as e:
