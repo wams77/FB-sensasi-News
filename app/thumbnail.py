@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import urllib.request
 from pathlib import Path
 from textwrap import fill
 from io import BytesIO
@@ -20,11 +21,23 @@ class ThumbnailGenerator:
     def __init__(self):
         self.output = CACHE_DIR / "thumbs"
         self.output.mkdir(parents=True, exist_ok=True)
+        
+        # --- AUTO DOWNLOAD FONT JIKA TIDAK ADA ---
+        font_path = Path("assets/fonts/Poppins-Bold.ttf")
+        if not font_path.exists():
+            logger.info("Font tidak ditemukan. Mengunduh Poppins-Bold.ttf otomatis...")
+            font_path.parent.mkdir(parents=True, exist_ok=True)
+            font_url = "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf"
+            try:
+                urllib.request.urlretrieve(font_url, font_path)
+                logger.info("Font berhasil diunduh!")
+            except Exception as e:
+                logger.error("Gagal mengunduh font: %s", e)
+
         try:
-            # PASTIKAN FILE INI ADA DI FOLDER PROJECT ANDA
-            self.title_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 58)
-            self.brand_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 30)
-            self.label_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 26)
+            self.title_font = ImageFont.truetype(str(font_path), 58)
+            self.brand_font = ImageFont.truetype(str(font_path), 30)
+            self.label_font = ImageFont.truetype(str(font_path), 26)
         except Exception as e:
             logger.error("FONT TIDAK DITEMUKAN! Menggunakan font default kecil. Error: %s", e)
             self.title_font = ImageFont.load_default()
