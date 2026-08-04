@@ -21,10 +21,12 @@ class ThumbnailGenerator:
         self.output = CACHE_DIR / "thumbs"
         self.output.mkdir(parents=True, exist_ok=True)
         try:
+            # PASTIKAN FILE INI ADA DI FOLDER PROJECT ANDA
             self.title_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 58)
             self.brand_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 30)
             self.label_font = ImageFont.truetype("assets/fonts/Poppins-Bold.ttf", 26)
-        except Exception:
+        except Exception as e:
+            logger.error("FONT TIDAK DITEMUKAN! Menggunakan font default kecil. Error: %s", e)
             self.title_font = ImageFont.load_default()
             self.brand_font = ImageFont.load_default()
             self.label_font = ImageFont.load_default()
@@ -38,13 +40,12 @@ class ThumbnailGenerator:
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content)).convert("RGB")
                 
-                # Jika gambar terlalu kecil (misal di bawah 400x300), abaikan agar tidak buram saat diperbesar
+                # Jika resolusi asli gambar terlalu kecil, buang agar tidak buram/pecah saat diperbesar
                 if img.width < 400 or img.height < 300:
-                    logger.warning("Gambar bawaan terlalu kecil (%dx%d). Mengabaikan gambar.", img.width, img.height)
+                    logger.warning("Gambar bawaan terlalu kecil (%dx%d). Menggunakan background solid.", img.width, img.height)
                     return None
 
-                # Gunakan ImageOps.fit untuk memotong (crop) dan meresize secara proporsional
-                # Ini mencegah gambar menjadi gepeng atau ditarik paksa
+                # Gunakan ImageOps.fit untuk memotong (crop) proporsional, BUKAN resize yang bikin gepeng
                 img = ImageOps.fit(img, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
                 return img
         except Exception as e:
@@ -64,9 +65,9 @@ class ThumbnailGenerator:
             # Coba ambil gambar asli dari artikel
             image = self.download_image(article.image)
             
-            # Fallback jika berita tidak punya gambar atau gambarnya terlalu kecil (buram)
+            # Fallback jika berita tidak punya gambar atau gambarnya buram
             if image is None:
-                logger.info("Menggunakan background solid karena tidak ada gambar atau gambar resolusi rendah.")
+                logger.info("Gambar berita tidak valid, menggunakan background solid.")
                 image = Image.new("RGB", (WIDTH, HEIGHT), color=(15, 23, 42))
 
             image = self.dark_overlay(image)
@@ -121,7 +122,7 @@ class ThumbnailGenerator:
             image.save(output, quality=95)
             
             article.thumbnail = str(output.resolve())
-            logger.info("Thumbnail berhasil disimpan: %s", article.thumbnail)
+            logger.info("Thumbnail dari gambar asli berhasil disimpan: %s", article.thumbnail)
             return article.thumbnail
             
         except Exception as e:
