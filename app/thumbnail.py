@@ -5,7 +5,7 @@ from textwrap import fill
 from io import BytesIO
 
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from config import CACHE_DIR
 from logger import logger
@@ -37,8 +37,15 @@ class ThumbnailGenerator:
             response = requests.get(image_url, timeout=15)
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content)).convert("RGB")
-                # Resize agar pas dengan dimensi standar (crop/fit ke 1200x630)
-                img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+                
+                # Jika gambar terlalu kecil (misal di bawah 400x300), abaikan agar tidak buram saat diperbesar
+                if img.width < 400 or img.height < 300:
+                    logger.warning("Gambar bawaan terlalu kecil (%dx%d). Mengabaikan gambar.", img.width, img.height)
+                    return None
+
+                # Gunakan ImageOps.fit untuk memotong (crop) dan meresize secara proporsional
+                # Ini mencegah gambar menjadi gepeng atau ditarik paksa
+                img = ImageOps.fit(img, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
                 return img
         except Exception as e:
             logger.warning("Gagal mendownload gambar asli: %s", e)
@@ -57,9 +64,9 @@ class ThumbnailGenerator:
             # Coba ambil gambar asli dari artikel
             image = self.download_image(article.image)
             
-            # Fallback jika berita tidak punya gambar (latar belakang warna gelap elegan)
+            # Fallback jika berita tidak punya gambar atau gambarnya terlalu kecil (buram)
             if image is None:
-                logger.info("Gambar berita tidak ditemukan, menggunakan background solid.")
+                logger.info("Menggunakan background solid karena tidak ada gambar atau gambar resolusi rendah.")
                 image = Image.new("RGB", (WIDTH, HEIGHT), color=(15, 23, 42))
 
             image = self.dark_overlay(image)
@@ -114,7 +121,7 @@ class ThumbnailGenerator:
             image.save(output, quality=95)
             
             article.thumbnail = str(output.resolve())
-            logger.info("Thumbnail dari gambar asli berhasil disimpan: %s", article.thumbnail)
+            logger.info("Thumbnail berhasil disimpan: %s", article.thumbnail)
             return article.thumbnail
             
         except Exception as e:
