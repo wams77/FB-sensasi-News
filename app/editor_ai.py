@@ -14,14 +14,13 @@ MODEL = "llama-3.3-70b-versatile"
 
 
 SYSTEM_PROMPT = """
-Kamu adalah jurnalis senior media online Indonesia.
+Kamu adalah jurnalis senior media online Indonesia dan analis profesional.
 
 Tugasmu adalah menulis ulang SATU berita menjadi artikel Facebook.
 
 ATURAN:
-
 - Jangan mengubah fakta.
-- Jangan menambah fakta.
+- Jangan menambah fakta di luar konteks.
 - Jangan membuat berita palsu.
 - Bahasa Indonesia.
 - Gaya media online profesional.
@@ -29,7 +28,8 @@ ATURAN:
 - Artikel 180-250 kata.
 - Awali dengan paragraf pembuka yang menarik.
 - Isi terdiri dari 2-3 paragraf.
-- Tutup dengan pertanyaan agar pembaca berdiskusi.
+- WAJIB membuat 1 paragraf "Analisis Profesional" yang tajam HANYA berdasarkan fakta berita tersebut (misal: analisis taktik/klasemen jika olahraga, atau dampak karier/sosial jika hiburan).
+- Tutup artikel dengan pertanyaan agar pembaca berdiskusi.
 - Jangan menyebut nama AI.
 - Maksimal 5 hashtag.
 - JANGAN gunakan tanda kutip ganda (") di dalam nilai teks JSON untuk menghindari error parsing. Gunakan kutip tunggal (') jika diperlukan.
@@ -37,12 +37,12 @@ ATURAN:
 Balas HARUS JSON VALID.
 
 Schema:
-
 {
     "viral_score":95,
     "priority":1,
     "headline":"",
     "article":"",
+    "analysis":"",
     "hashtags":[
         "#Football"
     ],
@@ -51,13 +51,9 @@ Schema:
 }
 
 priority:
-
 1 = Breaking
-
 2 = Viral
-
 3 = Normal
-
 4 = Skip
 """
 
@@ -84,7 +80,7 @@ SUMMARY
 SOURCE
 {article.source}
 
-Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
+Tulis ulang menjadi artikel Facebook yang menarik dan tambahkan analisis profesional tanpa mengubah fakta asli.
 """
 
     def analyze(
@@ -145,6 +141,11 @@ Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
                 "article",
                 article.summary
             )
+            # MENANGKAP HASIL ANALISIS DARI JSON AI
+            article.analysis = result.get(
+                "analysis",
+                ""
+            )
             article.hashtags = result.get(
                 "hashtags",
                 []
@@ -164,6 +165,7 @@ Tulis ulang menjadi artikel Facebook yang menarik tanpa mengubah fakta.
             article.priority = 4
             article.headline = article.title
             article.article = article.summary
+            article.analysis = ""
             article.hashtags = []
             article.emoji = ""
             return article
