@@ -3,8 +3,8 @@ name: Gosip.ID AI News Bot
 on:
   workflow_dispatch:
   schedule:
-    # Setiap 30 menit
-    - cron: "*/30 * * * *"
+    # Jam 01:00, 05:00, 11:00 UTC (Sama dengan Jam 09:00 WITA, 13:00 WITA, 19:00 WITA)
+    - cron: "0 1,5,11 * * *"
 
 jobs:
   bot:
