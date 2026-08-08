@@ -16,26 +16,20 @@ class PostBuilder:
         mandatory_hashtags = ["#semuaorang", "#GosipID"]
         current_hashtags = article.hashtags if article.hashtags else []
         
-        # Gabungkan hashtag AI dan hashtag wajib (tanpa duplikat)
-        all_hashtags = current_hashtags + mandatory_hashtags
+        # Gabungkan hashtag (mencegah duplikasi jika AI kebetulan membuat hashtag yang sama)
+        all_hashtags = current_hashtags + [h for h in mandatory_hashtags if h not in current_hashtags]
         hashtags_str = " ".join(all_hashtags)
 
-        # 2. Menyiapkan Analisis Profesional
-        # Menggunakan getattr agar tidak error jika model NewsArticle belum punya atribut 'analysis'
-        default_analysis = (
-            "Melihat perkembangan ini, dinamika yang terjadi memberikan sinyal kuat "
-            "akan adanya perubahan peta persaingan ke depannya. Langkah strategis "
-            "selanjutnya akan sangat krusial dalam memengaruhi tren secara keseluruhan."
-        )
-        analysis_text = getattr(article, "analysis", default_analysis)
+        # 2. Menyiapkan Analisis dari AI (Tanpa teks default)
+        analysis_section = ""
+        # Mengecek apakah atribut 'analysis' ada dan tidak kosong
+        if hasattr(article, "analysis") and article.analysis:
+            analysis_section = f"\n\n📊 Analisis Profesional:\n{article.analysis}"
 
         # 3. Merakit Teks Postingan
         text = f"""{article.emoji} {article.headline}
 
-{article.article}
-
-📊 Analisis Profesional:
-{analysis_text}
+{article.article}{analysis_section}
 
 {hashtags_str}{self.footer}
 """
@@ -79,12 +73,12 @@ if __name__ == "__main__":
         "gelar juara."
     )
     
-    # AI menghasilkan analysis (Opsional)
+    # Simulasi: AI membaca teks di atas dan menyimpulkan analisis ini
     article.analysis = (
-        "Kembalinya pemain pilar ini bukan hanya sekadar tambahan amunisi, "
-        "tetapi juga suntikan moral yang masif bagi ruang ganti Arsenal. "
-        "Secara taktik, Arteta kini memiliki fleksibilitas lebih untuk merotasi "
-        "skuad di tengah jadwal padat Liga Inggris dan kompetisi Eropa."
+        "Kembalinya pemain inti ini tidak hanya menaikkan moral tim, tetapi juga "
+        "memberikan Mikel Arteta opsi taktis yang krusial. Dalam perburuan gelar "
+        "Premier League yang ketat, kedalaman skuad sering kali menjadi penentu "
+        "utama antara juara dan runner-up."
     )
     
     article.hashtags = [
@@ -96,5 +90,3 @@ if __name__ == "__main__":
     builder = PostBuilder()
     print("=== POSTINGAN FACEBOOK ===")
     print(builder.build(article))
-    print("\n=== KOMENTAR SUMBER ===")
-    print(builder.build_comment(article))
