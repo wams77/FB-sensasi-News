@@ -12,18 +12,32 @@ class PostBuilder:
         )
 
     def build(self, article: NewsArticle) -> str:
-        hashtags = ""
+        # 1. Menyiapkan Hashtag Wajib & Hashtag dari AI
+        mandatory_hashtags = ["#semuaorang", "#GosipID"]
+        current_hashtags = article.hashtags if article.hashtags else []
+        
+        # Gabungkan hashtag AI dan hashtag wajib (tanpa duplikat)
+        all_hashtags = current_hashtags + mandatory_hashtags
+        hashtags_str = " ".join(all_hashtags)
 
-        if article.hashtags:
-            hashtags = " ".join(
-                article.hashtags
-            )
+        # 2. Menyiapkan Analisis Profesional
+        # Menggunakan getattr agar tidak error jika model NewsArticle belum punya atribut 'analysis'
+        default_analysis = (
+            "Melihat perkembangan ini, dinamika yang terjadi memberikan sinyal kuat "
+            "akan adanya perubahan peta persaingan ke depannya. Langkah strategis "
+            "selanjutnya akan sangat krusial dalam memengaruhi tren secara keseluruhan."
+        )
+        analysis_text = getattr(article, "analysis", default_analysis)
 
+        # 3. Merakit Teks Postingan
         text = f"""{article.emoji} {article.headline}
 
 {article.article}
 
-{hashtags}{self.footer}
+📊 Analisis Profesional:
+{analysis_text}
+
+{hashtags_str}{self.footer}
 """
 
         return text.strip()
@@ -64,6 +78,15 @@ if __name__ == "__main__":
         "kesayangannya mampu bersaing dalam perebutan "
         "gelar juara."
     )
+    
+    # AI menghasilkan analysis (Opsional)
+    article.analysis = (
+        "Kembalinya pemain pilar ini bukan hanya sekadar tambahan amunisi, "
+        "tetapi juga suntikan moral yang masif bagi ruang ganti Arsenal. "
+        "Secara taktik, Arteta kini memiliki fleksibilitas lebih untuk merotasi "
+        "skuad di tengah jadwal padat Liga Inggris dan kompetisi Eropa."
+    )
+    
     article.hashtags = [
         "#Arsenal",
         "#PremierLeague",
@@ -71,14 +94,7 @@ if __name__ == "__main__":
     ]
 
     builder = PostBuilder()
-    print(
-        builder.build(
-            article
-        )
-    )
-    print()
-    print(
-        builder.build_comment(
-            article
-        )
-    )
+    print("=== POSTINGAN FACEBOOK ===")
+    print(builder.build(article))
+    print("\n=== KOMENTAR SUMBER ===")
+    print(builder.build_comment(article))
