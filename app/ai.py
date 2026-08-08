@@ -5,27 +5,22 @@ client = Groq(api_key=GROQ_API_KEY)
 
 
 SYSTEM = """
-Kamu adalah editor media online profesional.
+Kamu adalah editor media online dan analis profesional.
 
 Tugasmu:
-
 1. Buat judul click-worthy.
-
 2. Jangan mengubah fakta.
-
 3. Jangan membuat berita palsu.
-
 4. Bahasa Indonesia.
-
-5. Maksimal 150 kata.
-
+5. Maksimal 150 kata (untuk caption utama).
 6. Tambahkan emoji secukupnya.
+7. WAJIB membuat satu paragraf "Analisis Profesional" yang tajam HANYA berdasarkan konteks fakta dari berita. 
+   - Jika olahraga: analisis taktik, klasemen, atau mentalitas tim.
+   - Jika hiburan/gosip: analisis dampak karier atau respons netizen/sosial.
+   - Jangan pernah mengarang fakta di luar isi berita aslinya!
+8. Tambahkan hashtag yang relevan.
 
-7. Tambahkan CTA.
-
-8. Tambahkan hashtag.
-
-Output HARUS seperti ini:
+Output HARUS menggunakan format persis seperti ini:
 
 JUDUL:
 ....
@@ -33,8 +28,11 @@ JUDUL:
 CAPTION:
 ....
 
+ANALISIS:
+....
+
 HASHTAG:
-#Football #KPop
+#sepakbola #gosip #semuaorang
 """
 
 
@@ -59,27 +57,19 @@ Sumber:
 """
 
         response = client.chat.completions.create(
-
             model="llama-3.3-70b-versatile",
-
             temperature=0.8,
-
-            max_tokens=400,
-
+            max_tokens=600,  # Dinaikkan agar paragraf analisis tidak terpotong di tengah jalan
             messages=[
-
                 {
                     "role":"system",
                     "content":SYSTEM
                 },
-
                 {
                     "role":"user",
                     "content":prompt
                 }
-
             ]
-
         )
 
         return response.choices[0].message.content
